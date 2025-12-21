@@ -1,0 +1,27 @@
+File > HTML + Image > Text
+==========================
+application/vnd.openxmlformats-officedocument.wordprocessingml.document
+application/pdf
+
+Image > Text
+======================
+image/jpeg
+image/png
+
+> Text
+======
+application/java
+application/json
+application/octet-stream
+application/vnd.google-apps.document
+application/vnd.jgraph.mxfile
+application/x-msdos-program
+application/x-msdownload
+application/x-zip
+application/x-zip-compressed
+text/html
+text/javascript
+text/plain
+text/x-java
+text/x-python
+text/xml
