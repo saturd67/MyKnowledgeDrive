@@ -35,20 +35,16 @@ class TextEmbedderService:
                 metadatas=metadatas
             )
 
-            print(len(metadatas))
-
         logger.info("Adding collection done")
 
         logger.info("Query collection")
         results = collection.query(
-            query_texts = ["TypeScript arrays examples"],
+            query_texts = ["Java arrays examples"],
             n_results = 1,
             include = ["distances", "metadatas", "documents"],
         )
 
-        print(results.get("ids")[0])
-        print(results.get("documents")[0])
-        print(results.get("metadatas")[0])
+        print(results.get("metadatas")[0][0].get("label"))
 
 
     def get_files_content(self):
