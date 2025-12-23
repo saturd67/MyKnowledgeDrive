@@ -1,0 +1,5 @@
+from pathlib import Path
+
+BASE_DIR = str(Path(__file__).parent.parent)
+INPUT_FILE_DIR = BASE_DIR + "\\resources\\files"
+OUTPUT_FILE_DIR = BASE_DIR + "\\resources\\converted_files"

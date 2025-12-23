@@ -20,7 +20,8 @@ class FetchFileService:
     FOLDER_ID = "1VWtBJ4KClTf7v8ULab7VN-45QK-au0DO"
 
     def __init__(self, output_folder):
-        self.file_downloader = DownloadFileService(output_folder)
+        self.output_folder = output_folder
+        self.file_downloader = DownloadFileService(self.output_folder)
 
     def start_fetching(self):
         self.file_downloader.clear_existing_files()
@@ -43,7 +44,7 @@ class FetchFileService:
                 count += self._get_files(parent_path + ("\\" if parent_path else "") + file['name'], file["id"])
             else:
                 count += 1
-                self.file_downloader.download_file(parent_path, file)
+                self.file_downloader.download_file(service, parent_path, file)
                 # logger.info(parent_path)
                 # logger.info(f"Name: {file['name']}")
                 # logger.info(f"ID: {file['id']}")
