@@ -1,10 +1,9 @@
-from constant.paths import INPUT_FILE_DIR
-from services.FetchFileService import FetchFileService
+from constant.paths import INPUT_FILE_DIR, BASE_DIR
 from pathlib import Path
 from components.FileManager import OutputFileFactory
 import logging
-import constant.paths
 from services.FileConverterService import FileConverterService
+from services.TextEmbedderService import TextEmbedderService
 
 ENABLE_LOGGING = True
 
@@ -15,10 +14,11 @@ logging.basicConfig(
 
 
 if __name__ == "__main__":
-    fileConverterService = FileConverterService()
-    fileConverterService.convert_files()
+    # fileConverterService = FileConverterService()
+    # fileConverterService.start_convert_files()
 
-    # output_file = OutputFileFactory.get_file(INPUT_FILE_DIR + "\\Flutter\\Styling\\flutter_style_sharing.zip")
+    textEmbedderService = TextEmbedderService()
+    textEmbedderService.start_embedding(is_new_collection=True)
 
 # import inquirer
 # questions = [

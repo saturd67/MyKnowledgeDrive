@@ -9,12 +9,12 @@ from constant.paths import INPUT_FILE_DIR, OUTPUT_FILE_DIR
 logger = logging.getLogger(__name__)
 
 class FileConverterService:
-    def convert_files(self):
+    def start_convert_files(self):
         logger.info("Start converting files")
         self._clear_existing_files()
         total = self._get_file(INPUT_FILE_DIR)
         logger.info("File conversion completed")
-        logger.info("Total converted file: " + str(total))
+        logger.info("Total converted files: " + str(total))
 
     def _clear_existing_files(self):
         logger.info(f"Clearing: {OUTPUT_FILE_DIR}")

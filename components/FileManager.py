@@ -38,6 +38,7 @@ class OutputFile(ABC):
         output_file = OUTPUT_FILE_DIR + "\\" + self.get_file_path()[:self.get_file_path().rfind(".")] + ".txt"
         logger.info(f"Generating file: {output_file}")
         with open(output_file, 'w', encoding="utf-8") as file:
+            file_content = "File: " + output_file + "\n\n" + file_content
             file.write(file_content)
 
 
@@ -54,11 +55,10 @@ class DocFile(OutputFile):
 
         # Convert HTML + Image to Text
         soup = BeautifulSoup(file_html, 'html.parser')
-
         total_img = len(soup.find_all('img'))
         for index, img in enumerate(soup.find_all('img')):
             logger.info(f"Converting image to text: {self.get_file_path()} ({index + 1}/{total_img})")
-            img.replace_with(f'\n-----img start-----\n{self._base64_image_to_text(img)}\n-----img end-----\n\n')
+            img.replace_with(f'\n\n-----img start-----\n{self._base64_image_to_text(img)}\n-----img end-----\n\n')
 
         self._generate_file(soup.get_text(separator="\n", strip=True))
 
@@ -84,6 +84,8 @@ class ImageFile(OutputFile):
     def _image_to_text(self):
         image = Image.open(self.get_full_path())
         return pytesseract.image_to_string(image)
+
+
 
 class OtherFile(OutputFile):
     EXTENSIONS = [
