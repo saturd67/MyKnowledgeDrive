@@ -15,6 +15,12 @@ logging.basicConfig(
 
 logger = logging.getLogger(__name__)
 
+chrome_path = f"C:\Program Files\Google\Chrome\Application\chrome.exe"
+
+profile = "Profile 1"
+
+webbrowser.register("chrome", None, webbrowser.BackgroundBrowser(chrome_path))
+
 if __name__ == "__main__":
     logger.info("Starting user portal...")
 
@@ -36,4 +42,4 @@ if __name__ == "__main__":
                 )
             ]
             answer = inquirer.prompt(questions)
-            webbrowser.open(answer["path"])
+            webbrowser.get("chrome").open(answer["path"])

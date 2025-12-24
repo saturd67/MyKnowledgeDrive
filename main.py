@@ -1,9 +1,10 @@
 from constant.paths import INPUT_FILE_DIR, BASE_DIR
 from pathlib import Path
 from components.FileManager import OutputFileFactory
+from services.FileFetcherService import FileFetcherService
+
 import logging
-from services.FileConverterService import FileConverterService
-from services.TextEmbedderService import TextEmbedderService
+
 
 ENABLE_LOGGING = True
 
@@ -14,8 +15,5 @@ logging.basicConfig(
 
 
 if __name__ == "__main__":
-    # fileConverterService = FileConverterService()
-    # fileConverterService.start_convert_files()
-
-    textEmbedderService = TextEmbedderService()
-    textEmbedderService.query("Java array sample")
+    file_fetcher_service = FileFetcherService()
+    file_fetcher_service.start_file_id_fetching()

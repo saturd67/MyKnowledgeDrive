@@ -1,23 +1,47 @@
-# import logging
-# from os import mkdir
-# from googleapiclient.discovery import build
-# from googleapiclient.http import MediaIoBaseDownload
-# from google.oauth2.service_account import Credentials
-#
-# logger = logging.getLogger(__name__)
-#
-# class FetchFileService:
-#     FOLDER_MIME_TYPE = "application/vnd.google-apps.folder"
-#
-#     SCOPES = ["https://www.googleapis.com/auth/drive.readonly"]
-#     SERVICE_ACCOUNT_FILE = "C:/secrets/my_knowledge_drive_service_account.json"
-#
-#     creds = Credentials.from_service_account_file(
-#         SERVICE_ACCOUNT_FILE, scopes=SCOPES
-#     )
-#
-#     FOLDER_ID = "1VWtBJ4KClTf7v8ULab7VN-45QK-au0DO"
-#
+import logging
+from googleapiclient.discovery import build
+from googleapiclient.http import MediaIoBaseDownload
+from google.oauth2.service_account import Credentials
+
+logger = logging.getLogger(__name__)
+
+class FileFetcherService:
+    FOLDER_MIME_TYPE = "application/vnd.google-apps.folder"
+
+    SCOPES = ["https://www.googleapis.com/auth/drive.readonly"]
+    SERVICE_ACCOUNT_FILE = "C:/secrets/my_knowledge_drive_service_account.json"
+
+    creds = Credentials.from_service_account_file(
+        SERVICE_ACCOUNT_FILE, scopes=SCOPES
+    )
+
+    FOLDER_ID = "1VWtBJ4KClTf7v8ULab7VN-45QK-au0DO"
+
+    def start_file_id_fetching(self):
+        file_id_paths = self._get_file_id("", FileFetcherService.FOLDER_ID)
+        for file_id_path in file_id_paths:
+            print(file_id_path)
+
+    def _get_file_id(self, parent_path, file_id):
+        service = build("drive", "v3", credentials=self.creds, cache_discovery=False)
+        results = service.files().list(
+            q=f"'{file_id}' in parents and trashed = false",
+            fields="files(id, name, mimeType)"
+        ).execute()
+
+        file_id_paths = []
+        files = results.get("files", [])
+        for file in files:
+            if file["mimeType"] == FileFetcherService.FOLDER_MIME_TYPE:
+                file_id_paths += self._get_file_id(parent_path + ("\\" if parent_path else "") + file['name'], file["id"])
+            else:
+                logger.info(parent_path + "\\" + file['name'])
+                # logger.info(f"ID: {file['id']}")
+                # logger.info(f"Type: {file['mimeType']}")
+                file_id_paths.append({"id": file["id"], "path": parent_path + "\\" + file['name']})
+
+        return file_id_paths
+
 #     def __init__(self, output_folder):
 #         self.file_downloader = DownloadFileService(output_folder)
 #
