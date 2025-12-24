@@ -45,6 +45,7 @@ if __name__ == '__main__':
     ]
 
     os.system("cls" if os.name == "nt" else "clear")
+
     print("+-----------------------------+")
     print("| Welcome to the admin portal |")
     print("+-----------------------------+")

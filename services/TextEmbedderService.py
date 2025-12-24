@@ -55,15 +55,24 @@ class TextEmbedderService:
         self.chroma_client.delete_collection(name="my_knowledge_drive")
         self.collection = self.chroma_client.get_or_create_collection(name="my_knowledge_drive", embedding_function=self.sentence_transformer)
 
-    def query(self):
+    def query(self, query):
         logger.info("Querying collection")
+
         results = self.collection.query(
-            query_texts = ["Java arrays examples"],
-            n_results = 1,
+            query_texts = [query],
+            n_results = 5,
             include = ["distances", "metadatas", "documents"],
         )
 
-        print(results.get("metadatas")[0][0].get("label"))
+        ids = results.get("ids")[0]
+        metadatas = results.get("metadatas")[0]
+        distances = results.get("distances")[0]
+
+        output = []
+        for index in range(len(ids)):
+            output.append({"id": ids[index], "metadata": metadatas[index], "distance": distances[index]})
+
+        return output
 
     def get_files_content(self):
         logger.info("Getting files")

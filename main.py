@@ -18,14 +18,4 @@ if __name__ == "__main__":
     # fileConverterService.start_convert_files()
 
     textEmbedderService = TextEmbedderService()
-    textEmbedderService.query()
-
-# import inquirer
-# questions = [
-#   inquirer.List('size',
-#                 message="What size do you need?",
-#                 choices=['Jumbo', 'Large', 'Standard', 'Medium', 'Small', 'Micro'],
-#             ),
-# ]
-# answers = inquirer.prompt(questions)
-# print (answers["size"])
+    textEmbedderService.query("Java array sample")
