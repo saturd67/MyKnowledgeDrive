@@ -18,7 +18,7 @@ if __name__ == "__main__":
     # fileConverterService.start_convert_files()
 
     textEmbedderService = TextEmbedderService()
-    textEmbedderService.start_embedding(is_new_collection=True)
+    textEmbedderService.query()
 
 # import inquirer
 # questions = [

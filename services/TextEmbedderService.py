@@ -10,42 +10,60 @@ logger = logging.getLogger(__name__)
 
 class TextEmbedderService:
 
-    def start_embedding(self, is_new_collection = True):
-        logger.info("Start embedding files")
+    def __init__(self):
+        self.chroma_client = chromadb.PersistentClient(path="./my_chroma_store")
+        self.sentence_transformer = embedding_functions.SentenceTransformerEmbeddingFunction(model_name = 'all-MiniLM-L6-v2')
+        self.collection = self.chroma_client.get_or_create_collection(name="my_knowledge_drive", embedding_function=self.sentence_transformer)
 
-        chroma_client = chromadb.PersistentClient(path="./my_chroma_store")
-        sentence_transformer = embedding_functions.SentenceTransformerEmbeddingFunction(model_name = 'all-MiniLM-L6-v2')
-        collection = chroma_client.get_or_create_collection(name="my_knowledge_drive", embedding_function=sentence_transformer)
+    def embed_collection(self):
+        logger.info("Start embedding files")
 
         files_content = self.get_files_content()
 
-        if is_new_collection:
-            logger.info("Adding collection")
-            ids = []
-            documents = []
-            metadatas = []
-            for index, file_content in enumerate(files_content):
-                ids.append(str(index + 1))
-                documents.append(file_content.get("content"))
-                metadatas.append({"label": file_content.get("file")})
+        logger.info("Adding collection")
+        ids = []
+        documents = []
+        metadatas = []
+        for index, file_content in enumerate(files_content):
+            ids.append(str(index + 1))
+            documents.append(file_content.get("content"))
+            metadatas.append({"label": file_content.get("file")})
 
-            collection.add(
-                ids=ids,
-                documents=documents,
-                metadatas=metadatas
-            )
+        self.collection.add(
+            ids=ids,
+            documents=documents,
+            metadatas=metadatas
+        )
 
-        logger.info("Adding collection done")
+        logger.info(f"Total embedded files: {self.collection.count()}")
 
-        logger.info("Query collection")
-        results = collection.query(
+    def check_collection(self, page):
+        logger.info("Checking collection")
+
+        limit = 10
+        offset = limit * (page - 1)
+
+        results = self.collection.get(limit=limit, offset=offset)
+        ids = results['ids']
+        metadatas = results['metadatas']
+        for id, metadata in zip(ids, metadatas):
+            print(f"{id}: {metadata.get('label').replace('\\\\', '\\\\')}")
+        print(f"Total collections: {self.collection.count()}")
+
+    def reset_collection(self):
+        logger.info("Clearing collection")
+        self.chroma_client.delete_collection(name="my_knowledge_drive")
+        self.collection = self.chroma_client.get_or_create_collection(name="my_knowledge_drive", embedding_function=self.sentence_transformer)
+
+    def query(self):
+        logger.info("Querying collection")
+        results = self.collection.query(
             query_texts = ["Java arrays examples"],
             n_results = 1,
             include = ["distances", "metadatas", "documents"],
         )
 
         print(results.get("metadatas")[0][0].get("label"))
-
 
     def get_files_content(self):
         logger.info("Getting files")

@@ -1,6 +1,11 @@
-l1 = [1, 2, 3]
-l2 = [4, 5, 6]
-l3 = [7, 8, 9]
+import pyfiglet
 
-l1 += l2
-print(l1)
+for font in pyfiglet.FigletFont.getFonts():
+    print(font)
+    result = pyfiglet.figlet_format("Welcome to the admin portal", font=font)
+    print(result)
+    print("\n\n\n")
+
+
+# result = pyfiglet.figlet_format("Hello, World!", font="random")
+# print(result)
