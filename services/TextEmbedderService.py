@@ -1,10 +1,9 @@
 import logging
 import chromadb
 from chromadb.utils import embedding_functions
-
 from pathlib import Path
-
 from constant.paths import INPUT_FILE_DIR, OUTPUT_FILE_DIR
+from services.FileFetcherService import FileFetcherService
 
 logger = logging.getLogger(__name__)
 
@@ -18,16 +17,35 @@ class TextEmbedderService:
     def embed_collection(self):
         logger.info("Start embedding files")
 
+        file_fetcher_service = FileFetcherService()
+        file_ids = file_fetcher_service.start_file_id_fetching()
+
         files_content = self.get_files_content()
+
+        # logger.info("Show file ids")
+        # for file_id in file_ids:
+        #     print(file_id.get('file'))
+
+        # logger.info(f"\n\nStart mapping file ids...")
+        # for file_content in files_content:
+        #     n = next((file_id for file_id in file_ids if file_id.get('file') == file_content.get('file')), None)
+        #     if n is not None:
+        #         print("Found - " + file_content.get('file'))
+        #         print(n)
+        #         print()
 
         logger.info("Adding collection")
         ids = []
         documents = []
         metadatas = []
         for index, file_content in enumerate(files_content):
-            ids.append(str(index + 1))
-            documents.append(file_content.get("content"))
-            metadatas.append({"label": file_content.get("file")})
+            file_id = next((file_id for file_id in file_ids if file_id.get('file') == file_content.get('file')), None)
+            if file_id is not None:
+                ids.append(file_id.get('id'))
+                documents.append(file_content.get("content"))
+                metadatas.append({"label": file_content.get("file")})
+            else:
+                logger.warning(f"File id not found: {file_content.get('file')}")
 
         self.collection.add(
             ids=ids,
@@ -47,7 +65,7 @@ class TextEmbedderService:
         ids = results['ids']
         metadatas = results['metadatas']
         for id, metadata in zip(ids, metadatas):
-            print(f"{id}: {metadata.get('label').replace('\\\\', '\\\\')}")
+            print(f"{id}: {metadata.get('label')}")
         print(f"Total collections: {self.collection.count()}")
 
     def reset_collection(self):
@@ -77,6 +95,14 @@ class TextEmbedderService:
     def get_files_content(self):
         logger.info("Getting files")
         file_contents = self._get_files_content(OUTPUT_FILE_DIR)
+
+
+        for file_content in file_contents:
+            full_file_path = file_content.get('file')
+            start_index = full_file_path.find(OUTPUT_FILE_DIR) + len(OUTPUT_FILE_DIR) + 1
+            end_index = full_file_path.rfind('.')
+            file_content['file'] = full_file_path[start_index:end_index]
+
         logger.info(f"Total files: {len(file_contents)}")
         return file_contents
 

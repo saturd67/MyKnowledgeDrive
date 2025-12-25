@@ -1,7 +1,10 @@
 import logging
+import re
 from googleapiclient.discovery import build
 from googleapiclient.http import MediaIoBaseDownload
 from google.oauth2.service_account import Credentials
+
+from constant.paths import OUTPUT_FILE_DIR
 
 logger = logging.getLogger(__name__)
 
@@ -19,8 +22,7 @@ class FileFetcherService:
 
     def start_file_id_fetching(self):
         file_id_paths = self._get_file_id("", FileFetcherService.FOLDER_ID)
-        for file_id_path in file_id_paths:
-            print(file_id_path)
+        return file_id_paths
 
     def _get_file_id(self, parent_path, file_id):
         service = build("drive", "v3", credentials=self.creds, cache_discovery=False)
@@ -32,13 +34,15 @@ class FileFetcherService:
         file_id_paths = []
         files = results.get("files", [])
         for file in files:
+            next_path = parent_path + ("\\" if parent_path else "") + file['name']
             if file["mimeType"] == FileFetcherService.FOLDER_MIME_TYPE:
-                file_id_paths += self._get_file_id(parent_path + ("\\" if parent_path else "") + file['name'], file["id"])
+                file_id_paths += self._get_file_id(next_path, file["id"])
             else:
-                logger.info(parent_path + "\\" + file['name'])
+                logger.info(next_path)
                 # logger.info(f"ID: {file['id']}")
                 # logger.info(f"Type: {file['mimeType']}")
-                file_id_paths.append({"id": file["id"], "path": parent_path + "\\" + file['name']})
+                next_path = next_path.rsplit(".", 1)[0]
+                file_id_paths.append({"id": file["id"], "file": next_path})
 
         return file_id_paths
 

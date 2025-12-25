@@ -16,4 +16,6 @@ logging.basicConfig(
 
 if __name__ == "__main__":
     file_fetcher_service = FileFetcherService()
-    file_fetcher_service.start_file_id_fetching()
+    results = file_fetcher_service.start_file_id_fetching()
+    for result in results:
+        print(result.get("file"))

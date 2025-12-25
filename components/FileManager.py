@@ -35,7 +35,8 @@ class OutputFile(ABC):
             logger.info(f"Creating output path: {output_path}")
             output_path.mkdir(parents=True, exist_ok=True)
 
-        output_file = OUTPUT_FILE_DIR + "\\" + self.get_file_path()[:self.get_file_path().rfind(".")] + ".txt"
+        file = self.get_file_path().rsplit(".", 1)[0]
+        output_file = OUTPUT_FILE_DIR + "\\" + file + ".txt"
         logger.info(f"Generating file: {output_file}")
         with open(output_file, 'w', encoding="utf-8") as file:
             file_content = "File: " + output_file + "\n\n" + file_content

@@ -1,5 +1,6 @@
 from numpy.ma.core import resize
 
+from constant.paths import OUTPUT_FILE_DIR
 from services.TextEmbedderService import TextEmbedderService
 import os
 import logging
@@ -33,13 +34,19 @@ if __name__ == "__main__":
         os.system("cls" if os.name == "nt" else "clear")
 
         results = text_embedder_service.query(user_input)
+
+        choices = []
+        for result in results:
+            file_path = result.get("metadata").get("label")
+            choices.append((file_path, result.get("id")))
         if len(results) > 0:
             questions = [
                 inquirer.List(
-                    "path",
-                    message="Choose a path",
-                    choices=[(result.get("metadata").get("label").replace("\\\\", "\\"), result.get("id")) for result in results]
+                    "file",
+                    message="Choose a file",
+                    choices=choices
                 )
             ]
             answer = inquirer.prompt(questions)
-            webbrowser.get("chrome").open(answer["path"])
+
+            webbrowser.get("chrome").open("https://drive.google.com/file/d/" + answer["file"])
