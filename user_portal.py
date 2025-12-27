@@ -31,22 +31,29 @@ if __name__ == "__main__":
     while True:
         user_input = input(">")
 
-        os.system("cls" if os.name == "nt" else "clear")
 
         results = text_embedder_service.query(user_input)
 
-        choices = []
-        for result in results:
-            file_path = result.get("metadata").get("label")
-            choices.append((file_path, result.get("id")))
-        if len(results) > 0:
+        is_exist = True
+        while is_exist:
+            choices = []
+            for result in results:
+                file_path = result.get("metadata").get("label")
+                choices.append((file_path, result.get("id")))
+            choices.append(('Exit', 'exit'))
+
             questions = [
                 inquirer.List(
-                    "file",
+                    "value",
                     message="Choose a file",
                     choices=choices
                 )
             ]
             answer = inquirer.prompt(questions)
 
-            webbrowser.get("chrome").open("https://drive.google.com/file/d/" + answer["file"])
+            os.system("cls" if os.name == "nt" else "clear")
+
+            if answer["value"] != "exit":
+                webbrowser.get("chrome").open("https://drive.google.com/file/d/" + answer["value"])
+            else:
+                is_exist = False
