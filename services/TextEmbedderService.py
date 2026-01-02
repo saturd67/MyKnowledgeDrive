@@ -66,6 +66,9 @@ class TextEmbedderService:
         metadatas = results['metadatas']
         for id, metadata in zip(ids, metadatas):
             print(f"{id}: {metadata.get('label')}")
+
+    def check_total_collection(self):
+        logger.info("Getting total collection")
         print(f"Total collections: {self.collection.count()}")
 
     def reset_collection(self):

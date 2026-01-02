@@ -2,6 +2,7 @@ import inquirer
 import logging
 import os
 
+from services.FileConverterService import FileConverterService
 from services.TextEmbedderService import TextEmbedderService
 
 ENABLE_LOGGING = True
@@ -18,14 +19,17 @@ class Action:
     def __init__(self):
         logger.info("Initializing text embedder...")
         self.text_embedder_service = TextEmbedderService()
+        self.file_converter_service = FileConverterService()
 
     def reset(self):
         logger.info("Reseting collection")
+        self.file_converter_service.start_convert_files()
         self.text_embedder_service.reset_collection()
         self.text_embedder_service.embed_collection()
 
     def check(self):
         logger.info("Checking collection")
+        self.text_embedder_service.check_total_collection()
         page = input("Page: ")
         self.text_embedder_service.check_collection(int(page))
 
