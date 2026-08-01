@@ -24,6 +24,10 @@ class OutputFile(ABC):
     def get_full_path(self):
         return INPUT_FILE_DIR + "\\" + self.path + "\\" + self.filename
 
+    def get_output_file_path(self):
+        relative_file = self.get_file_path().rsplit(".", 1)[0]
+        return OUTPUT_FILE_DIR + "\\" + relative_file + ".txt"
+
     @abstractmethod
     def convert(self):
         pass
@@ -35,8 +39,7 @@ class OutputFile(ABC):
             logger.info(f"Creating output path: {output_path}")
             output_path.mkdir(parents=True, exist_ok=True)
 
-        file = self.get_file_path().rsplit(".", 1)[0]
-        output_file = OUTPUT_FILE_DIR + "\\" + file + ".txt"
+        output_file = self.get_output_file_path()
         logger.info(f"Generating file: {output_file}")
         with open(output_file, 'w', encoding="utf-8") as file:
             file_content = "File: " + output_file + "\n\n" + file_content

@@ -1,5 +1,6 @@
 import logging
 import chromadb
+from chromadb.config import Settings
 from chromadb.utils import embedding_functions
 from pathlib import Path
 from constant.paths import INPUT_FILE_DIR, OUTPUT_FILE_DIR
@@ -10,7 +11,10 @@ logger = logging.getLogger(__name__)
 class TextEmbedderService:
 
     def __init__(self):
-        self.chroma_client = chromadb.PersistentClient(path="./my_chroma_store")
+        self.chroma_client = chromadb.PersistentClient(
+            path="./my_chroma_store",
+            settings=Settings(anonymized_telemetry=False)
+        )
         self.sentence_transformer = embedding_functions.SentenceTransformerEmbeddingFunction(model_name = 'all-MiniLM-L6-v2')
         self.collection = self.chroma_client.get_or_create_collection(name="my_knowledge_drive", embedding_function=self.sentence_transformer)
 
@@ -22,18 +26,6 @@ class TextEmbedderService:
 
         files_content = self.get_files_content()
 
-        # logger.info("Show file ids")
-        # for file_id in file_ids:
-        #     print(file_id.get('file'))
-
-        # logger.info(f"\n\nStart mapping file ids...")
-        # for file_content in files_content:
-        #     n = next((file_id for file_id in file_ids if file_id.get('file') == file_content.get('file')), None)
-        #     if n is not None:
-        #         print("Found - " + file_content.get('file'))
-        #         print(n)
-        #         print()
-
         logger.info("Adding collection")
         ids = []
         documents = []
@@ -43,7 +35,7 @@ class TextEmbedderService:
             if file_id is not None:
                 ids.append(file_id.get('id'))
                 documents.append(file_content.get("content"))
-                metadatas.append({"label": file_content.get("file")})
+                metadatas.append({"label": file_content.get("file"), "modifiedTime": file_id.get("modifiedTime")})
             else:
                 logger.warning(f"File id not found: {file_content.get('file')}")
 
@@ -54,6 +46,65 @@ class TextEmbedderService:
         )
 
         logger.info(f"Total embedded files: {self.collection.count()}")
+
+    def sync_collection(self):
+        logger.info("Syncing collection")
+
+        file_fetcher_service = FileFetcherService()
+        drive_files = file_fetcher_service.start_file_id_fetching()
+        drive_ids = {drive_file.get("id") for drive_file in drive_files}
+
+        existing_collection = self.collection.get(include=["metadatas"])
+        existing_collection_modified_time = {
+            id_: (metadata or {}).get("modifiedTime")
+            for id_, metadata in zip(existing_collection.get("ids", []), existing_collection.get("metadatas", []))
+        }
+
+        existing_collection_to_upsert = [
+            drive_file for drive_file in drive_files
+            if existing_collection_modified_time.get(drive_file.get("id"), object()) != drive_file.get("modifiedTime")
+        ]
+        added_collection_count = sum(1 for drive_file in existing_collection_to_upsert if drive_file.get("id") not in existing_collection_modified_time)
+        updated_collection_count = len(existing_collection_to_upsert) - added_collection_count
+
+        removed_collection_ids = [id_ for id_ in existing_collection_modified_time if id_ not in drive_ids]
+
+        if existing_collection_to_upsert:
+            upsert_paths = {drive_file.get("file") for drive_file in existing_collection_to_upsert}
+            content_by_file = {
+                file_content.get("file"): file_content.get("content")
+                for file_content in self.get_files_content()
+                if file_content.get("file") in upsert_paths
+            }
+
+            ids = []
+            documents = []
+            metadatas = []
+            for drive_file in existing_collection_to_upsert:
+                file_path = drive_file.get("file")
+                content = content_by_file.get(file_path)
+                if content is None:
+                    logger.warning(f"Converted file not found, skipping: {file_path}")
+                    continue
+                ids.append(drive_file.get("id"))
+                documents.append(content)
+                metadatas.append({"label": file_path, "modifiedTime": drive_file.get("modifiedTime")})
+
+            if ids:
+                self.collection.upsert(
+                    ids=ids,
+                    documents=documents,
+                    metadatas=metadatas
+                )
+
+        if removed_collection_ids:
+            self.collection.delete(ids=removed_collection_ids)
+
+        unchanged = len(drive_files) - len(existing_collection_to_upsert)
+        logger.info(
+            f"Sync completed - added: {added_collection_count}, updated: {updated_collection_count}, "
+            f"removed: {len(removed_collection_ids)}, unchanged: {unchanged}"
+        )
 
     def check_collection(self, page):
         logger.info("Checking collection")

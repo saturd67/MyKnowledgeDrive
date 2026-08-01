@@ -28,7 +28,7 @@ class FileFetcherService:
         service = build("drive", "v3", credentials=self.creds, cache_discovery=False)
         results = service.files().list(
             q=f"'{file_id}' in parents and trashed = false",
-            fields="files(id, name, mimeType)"
+            fields="files(id, name, mimeType, modifiedTime)"
         ).execute()
 
         file_id_paths = []
@@ -42,7 +42,7 @@ class FileFetcherService:
                 # logger.info(f"ID: {file['id']}")
                 # logger.info(f"Type: {file['mimeType']}")
                 next_path = next_path.rsplit(".", 1)[0]
-                file_id_paths.append({"id": file["id"], "file": next_path})
+                file_id_paths.append({"id": file["id"], "file": next_path, "modifiedTime": file.get("modifiedTime")})
 
         return file_id_paths
 

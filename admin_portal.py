@@ -27,6 +27,11 @@ class Action:
         self.text_embedder_service.reset_collection()
         self.text_embedder_service.embed_collection()
 
+    def sync(self):
+        logger.info("Syncing collection")
+        self.file_converter_service.sync_convert_files()
+        self.text_embedder_service.sync_collection()
+
     def check(self):
         logger.info("Checking collection")
         self.text_embedder_service.check_total_collection()
@@ -44,6 +49,7 @@ if __name__ == '__main__':
 
     choices = [
         {"name": "Check collections", "value": "check"},
+        {"name": "Sync collections", "value": "sync"},
         {"name": "Reset collections", "value": "reset"},
         {"name": "Exit", "value": "exit"}
     ]
@@ -69,6 +75,9 @@ if __name__ == '__main__':
             match answer.get("action"):
                 case "reset":
                     action.reset()
+
+                case "sync":
+                    action.sync()
 
                 case "check":
                     action.check()
