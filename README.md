@@ -55,8 +55,7 @@ Chroma document IDs double as "open in Drive" links.
 ```
 admin_portal.py          Interactive CLI to rebuild/inspect the knowledge base
 user_portal.py            Interactive CLI to search it and open results
-admin_portal_ui.py        Flet entry point for the admin desktop UI
-user_portal_ui.py         Flet entry point for the user desktop UI
+user_portal_ui.py         Flet entry point for the desktop UI (both portals)
 main.py                   Standalone script: lists Drive file IDs/paths (debug utility)
 ui/
   theme.py                Palette, spacing/radius tokens, the Flet theme (light only)
@@ -80,7 +79,6 @@ existing_file_types       Reference notes: MIME type -> conversion pipeline
 my_chroma_store/          Chroma's persistent vector DB files (gitignored, generated)
 run_admin_portal.bat      Windows launcher for admin_portal.py
 run_user_portal.bat       Windows launcher for user_portal.py
-run_admin_portal_ui.bat   Windows launcher for admin_portal_ui.py
 run_user_portal_ui.bat    Windows launcher for user_portal_ui.py
 plans/                    Design docs for features (sync-collections-plan.md is now implemented)
 ```
@@ -133,7 +131,6 @@ Picking one opens `https://drive.google.com/file/d/<id>` in Chrome.
 ### Desktop UI (Flet) — layout only
 
 ```
-run_admin_portal_ui.bat
 run_user_portal_ui.bat
 ```
 
@@ -142,9 +139,8 @@ renders from `ui/mock_data.py` and no button calls into the services yet.
 Actions show a "not wired up yet" toast and are marked with a `TODO` pointing
 at the CLI method they should eventually call.
 
-Either launcher opens both portals: a narrow rail down the far-left edge
-switches between them in place, so `run_user_portal_ui.bat` and
-`run_admin_portal_ui.bat` differ only in which one you land on.
+One launcher covers both portals: it opens on the user portal, and a narrow
+rail down the far-left edge switches to the admin portal in place.
 
 - **Admin UI** — sidebar with five screens: *Dashboard* (stat cards, pipeline
   view, quick actions, recent activity), *Collections* (filterable, paginated
