@@ -55,7 +55,16 @@ Chroma document IDs double as "open in Drive" links.
 ```
 admin_portal.py          Interactive CLI to rebuild/inspect the knowledge base
 user_portal.py            Interactive CLI to search it and open results
+admin_portal_ui.py        Flet entry point for the admin desktop UI
+user_portal_ui.py         Flet entry point for the user desktop UI
 main.py                   Standalone script: lists Drive file IDs/paths (debug utility)
+ui/
+  theme.py                Palette, spacing/radius tokens, the Flet theme (light only)
+  portal_rail.py          Far-left rail that swaps between the admin and user portals
+  widgets.py              Shared presentational controls (cards, pills, log console, ...)
+  mock_data.py            Placeholder data the screens render from
+  admin/                  Admin shell + Dashboard/Collections/Sync/Reset/Settings screens
+  user/                   User shell + search screen
 components/
   FileManager.py          OutputFile subclasses (DocFile/ImageFile/OtherFile/UnknownFile) + factory
 constant/
@@ -71,6 +80,8 @@ existing_file_types       Reference notes: MIME type -> conversion pipeline
 my_chroma_store/          Chroma's persistent vector DB files (gitignored, generated)
 run_admin_portal.bat      Windows launcher for admin_portal.py
 run_user_portal.bat       Windows launcher for user_portal.py
+run_admin_portal_ui.bat   Windows launcher for admin_portal_ui.py
+run_user_portal_ui.bat    Windows launcher for user_portal_ui.py
 plans/                    Design docs for features (sync-collections-plan.md is now implemented)
 ```
 
@@ -86,6 +97,8 @@ plans/                    Design docs for features (sync-collections-plan.md is 
   `services/FileFetcherService.py`, along with the target `FOLDER_ID`).
 - Google Chrome installed at the default Windows path — `user_portal.py`
   opens search results in Chrome using a hardcoded profile (`"Profile 1"`).
+- `flet==0.28.3` and `flet-desktop==0.28.3` (already installed in `.venv`) —
+  only needed for the desktop UI, not for the CLIs.
 
 ## Usage
 
@@ -116,6 +129,39 @@ run_user_portal.bat
 
 Type a query; the top 5 semantic matches are shown as a menu of file paths.
 Picking one opens `https://drive.google.com/file/d/<id>` in Chrome.
+
+### Desktop UI (Flet) — layout only
+
+```
+run_admin_portal_ui.bat
+run_user_portal_ui.bat
+```
+
+A Flet rewrite of both portals. **It is presentation only** — every screen
+renders from `ui/mock_data.py` and no button calls into the services yet.
+Actions show a "not wired up yet" toast and are marked with a `TODO` pointing
+at the CLI method they should eventually call.
+
+Either launcher opens both portals: a narrow rail down the far-left edge
+switches between them in place, so `run_user_portal_ui.bat` and
+`run_admin_portal_ui.bat` differ only in which one you land on.
+
+- **Admin UI** — sidebar with five screens: *Dashboard* (stat cards, pipeline
+  view, quick actions, recent activity), *Collections* (filterable, paginated
+  table of `id`/`label`), *Sync* (step list, run summary, log console),
+  *Reset* (impact breakdown, type-`RESET`-to-confirm gate, confirmation
+  dialog), *Settings* (read-only paths, Drive and embedding config).
+- **User UI** — a search-history sidebar on the left, a centred landing screen,
+  and the query field docked along the bottom; submitting swaps the landing
+  screen for a ranked result list showing relevance and cosine distance,
+  alongside a detail panel with the Drive id, converted-text preview and an
+  "Open in Google Drive" action.
+
+The *Sync* screen carries a small **Preview** dropdown so the idle / running /
+completed states can be reviewed while the actions are still stubs — remove it
+once the real logic is wired in.
+The search screen has "searching" and "no results" states built in
+(`ui/user/search_view.py`) that are unreachable until the query is wired up.
 
 ### main.py
 
