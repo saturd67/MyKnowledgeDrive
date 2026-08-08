@@ -130,7 +130,7 @@ def primary_button(text, on_click=None, icon=None, tone_name="primary", expand=F
     )
 
 
-def ghost_button(text, on_click=None, icon=None, tone_name="neutral", expand=False):
+def ghost_button(text, on_click=None, icon=None, tone_name="neutral", expand=False, dense=False):
     p = palette()
     fg, _ = tone(tone_name)
     color = p.text if tone_name == "neutral" else fg
@@ -142,7 +142,10 @@ def ghost_button(text, on_click=None, icon=None, tone_name="neutral", expand=Fal
         style=ft.ButtonStyle(
             color=color,
             side=ft.BorderSide(1, p.border),
-            padding=ft.padding.symmetric(horizontal=Space.XL, vertical=Space.LG),
+            padding=ft.padding.symmetric(
+                horizontal=Space.LG if dense else Space.XL,
+                vertical=Space.MD if dense else Space.LG,
+            ),
             shape=ft.RoundedRectangleBorder(radius=Radius.MD),
             text_style=ft.TextStyle(size=13, weight=ft.FontWeight.W_600),
         ),
@@ -201,6 +204,33 @@ def stat_card(icon, caption, value, hint=None, tone_name="primary", expand=True)
         ),
         padding=Space.XL,
         expand=expand,
+    )
+
+
+def editable_row(key, value, is_mono=False, trailing=None):
+    """Labelled text input - the writable counterpart of `kv_row`."""
+    p = palette()
+    field = ft.TextField(
+        value=value,
+        text_size=12,
+        text_style=ft.TextStyle(font_family=MONO_FONT_FAMILY) if is_mono else None,
+        color=p.text,
+        dense=True,
+        expand=True,
+        content_padding=ft.padding.symmetric(horizontal=Space.MD, vertical=Space.SM),
+        filled=True,
+        fill_color=p.surface_alt,
+        border_color=p.border,
+        focused_border_color=p.primary,
+        border_radius=Radius.SM,
+    )
+    return ft.Row(
+        [
+            ft.Container(content=ft.Text(key, size=12, color=p.text_muted), width=170),
+            field,
+            trailing or ft.Container(),
+        ],
+        vertical_alignment=ft.CrossAxisAlignment.CENTER,
     )
 
 

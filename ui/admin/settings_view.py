@@ -25,7 +25,7 @@ def build(portal):
             ft.Row(
                 [
                     ft.Container(content=ft.Column([_paths(portal), _drive(portal)], spacing=Space.LG), expand=3),
-                    ft.Container(content=ft.Column([_embedding(portal), _about(portal)], spacing=Space.LG), expand=2),
+                    ft.Container(content=_embedding(portal), expand=2),
                 ],
                 spacing=Space.LG,
                 vertical_alignment=ft.CrossAxisAlignment.START,
@@ -43,16 +43,31 @@ def _copy(portal, what):
     )
 
 
+def _form_actions(portal, what):
+    return ft.Row(
+        [
+            ft.Container(expand=True),
+            w.ghost_button("Revert", icon=ft.Icons.UNDO_ROUNDED, dense=True,
+                           on_click=lambda _: portal.not_implemented(f"Revert {what}")),
+            w.primary_button("Save", icon=ft.Icons.CHECK_ROUNDED, dense=True,
+                             on_click=lambda _: portal.not_implemented(f"Save {what}")),
+        ],
+        spacing=Space.SM,
+    )
+
+
 def _paths(portal):
     rows = [
-        w.kv_row(name, value, is_mono=True, trailing=_copy(portal, name.lower()))
+        w.editable_row(name, value, is_mono=True, trailing=_copy(portal, name.lower()))
         for name, value in data.PATHS.items()
     ]
     return w.section(
         "Paths",
         "Defined in constant/paths.py.",
-        trailing=w.pill("Read only", "neutral", ft.Icons.LOCK_OUTLINE_ROUNDED),
-        content=ft.Column(rows, spacing=Space.MD),
+        content=ft.Column(
+            rows + [w.divider(bottom=Space.SM), _form_actions(portal, "paths")],
+            spacing=Space.MD,
+        ),
     )
 
 
@@ -64,10 +79,10 @@ def _drive(portal):
         trailing=w.pill("Read-only scope", "success", ft.Icons.CLOUD_DONE_ROUNDED),
         content=ft.Column(
             [
-                w.kv_row("Folder id", data.DRIVE_FOLDER_ID, is_mono=True,
-                         trailing=_copy(portal, "folder id")),
-                w.kv_row("Service account key", data.SERVICE_ACCOUNT_FILE, is_mono=True,
-                         trailing=_copy(portal, "key path")),
+                w.editable_row("Folder id", data.DRIVE_FOLDER_ID, is_mono=True,
+                               trailing=_copy(portal, "folder id")),
+                w.editable_row("Service account key", data.SERVICE_ACCOUNT_FILE, is_mono=True,
+                               trailing=_copy(portal, "key path")),
                 w.kv_row("Scope", "drive.readonly", is_mono=True),
                 ft.Container(
                     content=ft.Row(
@@ -88,6 +103,7 @@ def _drive(portal):
                     bgcolor=p.surface_alt,
                     border_radius=Radius.SM,
                 ),
+                _form_actions(portal, "Drive settings"),
             ],
             spacing=Space.MD,
         ),
@@ -112,15 +128,3 @@ def _embedding(portal):
     )
 
 
-def _about(portal):
-    return w.section(
-        "About",
-        content=ft.Column(
-            [
-                w.kv_row("Portal", "Admin"),
-                w.kv_row("UI framework", "Flet 0.28.3"),
-                w.kv_row("Theme", "Light"),
-            ],
-            spacing=Space.MD,
-        ),
-    )

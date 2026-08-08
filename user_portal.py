@@ -27,7 +27,7 @@ if __name__ == "__main__":
 
     text_embedder_service = TextEmbedderService()
 
-    os.subsystem("cls" if os.name == "nt" else "clear")
+    os.system("cls" if os.name == "nt" else "clear")
     while True:
         user_input = input(">")
 
