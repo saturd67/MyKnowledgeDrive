@@ -6,7 +6,7 @@ on the same Flet page.
 
 import flet as ft
 
-from ui.theme import Radius, Space, palette
+from view.theme import Radius, Space, palette
 
 PORTALS = [
     ("user", "User portal", ft.Icons.TRAVEL_EXPLORE_ROUNDED),
@@ -63,8 +63,8 @@ def switch(page, target):
     """
     page.controls.clear()
     if target == "admin":
-        from ui.admin.app import AdminPortal
+        from view.admin.app import AdminPortal
         AdminPortal(page).start(set_window=False)
     else:
-        from ui.user.app import UserPortal
+        from view.user.app import UserPortal
         UserPortal(page).start(set_window=False)

@@ -5,11 +5,11 @@ constants so the UI can be reviewed without a Drive connection, a Chroma
 store or an embedding model.
 """
 
-from constant.paths import BASE_DIR, INPUT_FILE_DIR, OUTPUT_FILE_DIR
+from constant.paths import BASE_DIR, CHROMA_STORE_DIR, INPUT_FILE_DIR, OUTPUT_FILE_DIR
 
 # Mirrors the values currently hardcoded in the services.
 COLLECTION_NAME = "my_knowledge_drive"
-CHROMA_STORE_PATH = "./my_chroma_store"
+CHROMA_STORE_PATH = CHROMA_STORE_DIR
 EMBEDDING_MODEL = "all-MiniLM-L6-v2"
 DRIVE_FOLDER_ID = "1VWtBJ4KClTf7v8ULab7VN-45QK-au0DO"
 SERVICE_ACCOUNT_FILE = "C:/secrets/my_knowledge_drive_service_account.json"

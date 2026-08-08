@@ -14,9 +14,9 @@ only network calls are to the Google Drive API to resolve file IDs.
 The pipeline has three stages, plus two small CLI "portals" on top:
 
 ```
-resources/files/            resources/converted_files/         my_chroma_store/
-(local mirror of a               (plain .txt per                (Chroma vector DB,
- Drive folder)                    source file)                   one embedding/file)
+resources/files/          resources/converted_files/    resources/my_chroma_store/
+(local mirror of a             (plain .txt per              (Chroma vector DB,
+ Drive folder)                  source file)                 one embedding/file)
 
    DocFile (.docx)   ──┐
    ImageFile (image)  ─┼──  FileConverterService  ──►  TextEmbedderService  ──►  query()
@@ -47,7 +47,7 @@ Chroma document IDs double as "open in Drive" links.
    Drive ID and a "open this file" link.
 3. **Embed** — `TextEmbedderService` embeds every converted `.txt` with
    `sentence-transformers` (`all-MiniLM-L6-v2`) into a persistent local
-   `chromadb` collection (`my_chroma_store/`), using the matched Drive file
+   `chromadb` collection (`resources/my_chroma_store/`), using the matched Drive file
    ID as the Chroma document ID and the relative path as label metadata.
 
 ## Project layout
@@ -57,7 +57,7 @@ admin_portal.py          Interactive CLI to rebuild/inspect the knowledge base
 user_portal.py            Interactive CLI to search it and open results
 my_knowledge_base_portal.py  Flet entry point for the desktop UI (both portals)
 main.py                   Standalone script: lists Drive file IDs/paths (debug utility)
-ui/
+view/
   theme.py                Palette, spacing/radius tokens, the Flet theme (light only)
   portal_rail.py          Far-left rail that swaps between the admin and user portals
   widgets.py              Shared presentational controls (cards, pills, log console, ...)
@@ -67,7 +67,8 @@ ui/
 components/
   FileManager.py          OutputFile subclasses (DocFile/ImageFile/OtherFile/UnknownFile) + factory
 constant/
-  paths.py                Shared path constants (BASE_DIR, INPUT_FILE_DIR, OUTPUT_FILE_DIR)
+  paths.py                Shared path constants (BASE_DIR, INPUT_FILE_DIR,
+                          OUTPUT_FILE_DIR, CHROMA_STORE_DIR)
 services/
   FileFetcherService.py   Google Drive API: recursive (id, relative path) listing
   FileConverterService.py Orchestrates resources/files -> resources/converted_files
@@ -75,8 +76,8 @@ services/
 resources/
   files/                  Local mirror of the Drive folder (gitignored, input)
   converted_files/        Converted plain-text output (gitignored, generated)
+  my_chroma_store/        Chroma's persistent vector DB files (gitignored, generated)
 existing_file_types       Reference notes: MIME type -> conversion pipeline
-my_chroma_store/          Chroma's persistent vector DB files (gitignored, generated)
 run_admin_portal.bat      Windows launcher for admin_portal.py
 run_user_portal.bat       Windows launcher for user_portal.py
 run_user_portal_ui.bat    Windows launcher for my_knowledge_base_portal.py
@@ -135,7 +136,7 @@ run_user_portal_ui.bat
 ```
 
 A Flet rewrite of both portals. **It is presentation only** — every screen
-renders from `ui/mock_data.py` and no button calls into the services yet.
+renders from `view/mock_data.py` and no button calls into the services yet.
 Actions show a "not wired up yet" toast and are marked with a `TODO` pointing
 at the CLI method they should eventually call.
 
@@ -158,7 +159,7 @@ The *Sync & Reset* screen carries a small **Preview** dropdown so the idle /
 running / completed states can be reviewed while the actions are still stubs —
 remove it once the real logic is wired in.
 The search screen has "searching" and "no results" states built in
-(`ui/user/search_view.py`) that are unreachable until the query is wired up.
+(`view/user/search_view.py`) that are unreachable until the query is wired up.
 
 ### main.py
 

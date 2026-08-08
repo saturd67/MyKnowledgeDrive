@@ -2,9 +2,9 @@
 
 import flet as ft
 
-from ui import mock_data as data
-from ui import widgets as w
-from ui.theme import Radius, Space, palette
+from view import mock_data as data
+from view import widgets as w
+from view.theme import Radius, Space, palette
 
 PAGE_SIZES = [10, 25, 50]
 

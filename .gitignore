@@ -1,5 +1,4 @@
 /files/
-my_chroma_store/*
 __pycache__/
 resources/*
 .idea/*

@@ -2,9 +2,9 @@
 
 import flet as ft
 
-from ui import mock_data as data
-from ui import widgets as w
-from ui.theme import MONO_FONT_FAMILY, Radius, Space, palette, tone
+from view import mock_data as data
+from view import widgets as w
+from view.theme import MONO_FONT_FAMILY, Radius, Space, palette, tone
 
 
 def build(portal):

@@ -2,7 +2,7 @@
 
 import flet as ft
 
-from ui.theme import MONO_FONT_FAMILY, Radius, Space, palette, tone
+from view.theme import MONO_FONT_FAMILY, Radius, Space, palette, tone
 
 
 # --- Text -------------------------------------------------------------------

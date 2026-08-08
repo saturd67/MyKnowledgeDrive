@@ -5,11 +5,11 @@ Presentation only - none of the actions call into the services yet.
 
 import flet as ft
 
-from ui import portal_rail
-from ui import theme
-from ui import widgets as w
-from ui.admin import collections_view, settings_view, sync_view
-from ui.theme import Radius, Space, palette
+from view import portal_rail
+from view import theme
+from view import widgets as w
+from view.admin import collections_view, settings_view, sync_view
+from view.theme import Radius, Space, palette
 
 NAV_ITEMS = [
     ("Collections", ft.Icons.TABLE_ROWS_OUTLINED, ft.Icons.TABLE_ROWS_ROUNDED, collections_view),

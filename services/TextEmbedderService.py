@@ -3,7 +3,7 @@ import chromadb
 from chromadb.config import Settings
 from chromadb.utils import embedding_functions
 from pathlib import Path
-from constant.paths import INPUT_FILE_DIR, OUTPUT_FILE_DIR
+from constant.paths import CHROMA_STORE_DIR, INPUT_FILE_DIR, OUTPUT_FILE_DIR
 from services.FileFetcherService import FileFetcherService
 
 logger = logging.getLogger(__name__)
@@ -12,7 +12,7 @@ class TextEmbedderService:
 
     def __init__(self):
         self.chroma_client = chromadb.PersistentClient(
-            path="./my_chroma_store",
+            path=CHROMA_STORE_DIR,
             settings=Settings(anonymized_telemetry=False)
         )
         self.sentence_transformer = embedding_functions.SentenceTransformerEmbeddingFunction(model_name = 'all-MiniLM-L6-v2')

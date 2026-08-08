@@ -5,12 +5,12 @@ Presentation only - no query ever reaches TextEmbedderService yet.
 
 import flet as ft
 
-from ui import mock_data as data
-from ui import portal_rail
-from ui import theme
-from ui import widgets as w
-from ui.theme import Radius, Space, palette
-from ui.user import search_view
+from view import mock_data as data
+from view import portal_rail
+from view import theme
+from view import widgets as w
+from view.theme import Radius, Space, palette
+from view.user import search_view
 
 
 class UserPortal:
