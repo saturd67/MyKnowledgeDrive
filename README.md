@@ -62,7 +62,7 @@ ui/
   portal_rail.py          Far-left rail that swaps between the admin and user portals
   widgets.py              Shared presentational controls (cards, pills, log console, ...)
   mock_data.py            Placeholder data the screens render from
-  admin/                  Admin shell + Dashboard/Collections/Sync/Reset/Settings screens
+  admin/                  Admin shell + Collections/Sync & Reset/Settings screens
   user/                   User shell + search screen
 components/
   FileManager.py          OutputFile subclasses (DocFile/ImageFile/OtherFile/UnknownFile) + factory
@@ -142,20 +142,21 @@ at the CLI method they should eventually call.
 One launcher covers both portals: it opens on the user portal, and a narrow
 rail down the far-left edge switches to the admin portal in place.
 
-- **Admin UI** — sidebar with five screens: *Dashboard* (stat cards, pipeline
-  view, quick actions, recent activity), *Collections* (filterable, paginated
-  table of `id`/`label`), *Sync* (step list, run summary, log console),
-  *Reset* (impact breakdown, type-`RESET`-to-confirm gate, confirmation
-  dialog), *Settings* (read-only paths, Drive and embedding config).
+- **Admin UI** — sidebar with three screens: *Collections* (stat cards plus a
+  filterable, paginated table of `id`/`label`), *Sync & Reset* (one screen with
+  a mode switch — sync shows the step list, run summary and log; reset swaps in
+  the danger banner, impact breakdown, type-`RESET`-to-confirm gate and
+  confirmation dialog), *Settings* (editable paths and Drive config, read-only
+  embedding config).
 - **User UI** — a search-history sidebar on the left, a centred landing screen,
   and the query field docked along the bottom; submitting swaps the landing
   screen for a ranked result list showing relevance and cosine distance,
   alongside a detail panel with the Drive id, converted-text preview and an
   "Open in Google Drive" action.
 
-The *Sync* screen carries a small **Preview** dropdown so the idle / running /
-completed states can be reviewed while the actions are still stubs — remove it
-once the real logic is wired in.
+The *Sync & Reset* screen carries a small **Preview** dropdown so the idle /
+running / completed states can be reviewed while the actions are still stubs —
+remove it once the real logic is wired in.
 The search screen has "searching" and "no results" states built in
 (`ui/user/search_view.py`) that are unreachable until the query is wired up.
 

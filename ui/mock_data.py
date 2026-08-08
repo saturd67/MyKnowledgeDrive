@@ -163,16 +163,3 @@ RESET_LOG = [
     ("09:07:38", "DONE", "Total embedded files: 312"),
 ]
 
-ACTIVITY = [
-    ("Sync completed", "added 6, updated 11, removed 2", "2h ago", "success"),
-    ("Conversion completed", "17 files reconverted, 331 skipped", "2h ago", "info"),
-    ("Unknown file skipped", "Format PC\\Tools\\rufus-4.1.exe", "2h ago", "warning"),
-    ("Reset completed", "348 converted, 312 embedded", "6d ago", "success"),
-    ("Drive listing fetched", "350 entries under the configured folder", "6d ago", "info"),
-]
-
-PIPELINE = [
-    ("Source files", "348", "resources\\files", "info"),
-    ("Converted text", "312", "resources\\converted_files", "warning"),
-    ("Embedded vectors", "312", "my_chroma_store", "success"),
-]

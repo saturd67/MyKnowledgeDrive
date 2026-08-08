@@ -8,14 +8,12 @@ import flet as ft
 from ui import portal_rail
 from ui import theme
 from ui import widgets as w
-from ui.admin import collections_view, dashboard_view, reset_view, settings_view, sync_view
+from ui.admin import collections_view, settings_view, sync_view
 from ui.theme import Radius, Space, palette
 
 NAV_ITEMS = [
-    ("Dashboard", ft.Icons.SPACE_DASHBOARD_OUTLINED, ft.Icons.SPACE_DASHBOARD_ROUNDED, dashboard_view),
     ("Collections", ft.Icons.TABLE_ROWS_OUTLINED, ft.Icons.TABLE_ROWS_ROUNDED, collections_view),
-    ("Sync", ft.Icons.SYNC_OUTLINED, ft.Icons.SYNC_ROUNDED, sync_view),
-    ("Reset", ft.Icons.RESTART_ALT_OUTLINED, ft.Icons.RESTART_ALT_ROUNDED, reset_view),
+    ("Sync & Reset", ft.Icons.SYNC_OUTLINED, ft.Icons.SYNC_ROUNDED, sync_view),
     ("Settings", ft.Icons.TUNE_OUTLINED, ft.Icons.TUNE_ROUNDED, settings_view),
 ]
 
@@ -29,6 +27,7 @@ class AdminPortal:
             "collections_page": 1,
             "collections_filter": "",
             "page_size": 10,
+            "sync_mode": "sync",     # sync | reset
             "sync_stage": "idle",
             "reset_confirm": "",
         }
