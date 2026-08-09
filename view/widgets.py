@@ -213,11 +213,12 @@ def stat_card(icon, caption, value, hint=None, tone_name="primary", expand=True)
     )
 
 
-def editable_row(key, value, is_mono=False, trailing=None):
+def editable_row(key, value, is_mono=False, trailing=None, on_change=None):
     """Labelled text input - the writable counterpart of `kv_row`."""
     p = palette()
     field = ft.TextField(
         value=value,
+        on_change=on_change,
         text_size=12,
         text_style=ft.TextStyle(font_family=MONO_FONT_FAMILY) if is_mono else None,
         color=p.text,

@@ -3,6 +3,7 @@ import logging
 import os
 
 from services.FileConverterService import FileConverterService
+from services.SettingService import settingService
 from services.TextEmbedderService import TextEmbedderService
 
 ENABLE_LOGGING = True
@@ -45,6 +46,7 @@ class Action:
 if __name__ == '__main__':
     logger.info("Starting admin portal...")
 
+    settingService.initialise()
     action = Action()
 
     choices = [

@@ -6,6 +6,8 @@ and the log, so the two runs read the same way.
 
 import flet as ft
 
+from constant.settings import EMBEDDING_COLLECTION, EMBEDDING_MODEL
+from services.SettingService import settingService
 from view import mock_data as data
 from view import widgets as w
 from view.theme import Radius, Space, palette, tone
@@ -31,12 +33,14 @@ RESET_STAGES = [
     ("Re-embed everything", "All converted text is embedded back into the store."),
 ]
 
-WIPES = [
-    (ft.Icons.FOLDER_DELETE_ROUNDED, "resources\\converted_files",
-     "Deleted and recreated - every source file is converted again."),
-    (ft.Icons.DELETE_SWEEP_ROUNDED, f"Chroma collection {data.COLLECTION_NAME}",
-     "Dropped and recreated, then re-embedded from scratch."),
-]
+def _wipes():
+    """Built per render - the collection name is read from the setting table."""
+    return [
+        (ft.Icons.FOLDER_DELETE_ROUNDED, "resources\\converted_files",
+         "Deleted and recreated - every source file is converted again."),
+        (ft.Icons.DELETE_SWEEP_ROUNDED, f"Chroma collection {settingService.get(EMBEDDING_COLLECTION)}",
+         "Dropped and recreated, then re-embedded from scratch."),
+    ]
 
 KEEPS = [
     (ft.Icons.SHIELD_ROUNDED, "resources\\files", "Your local mirror of the Drive folder is never touched."),
@@ -344,7 +348,7 @@ def _summary(stage):
                 w.divider(bottom=Space.MD),
                 w.kv_row("Started", "10:24:01"),
                 w.kv_row("Duration", "24s" if stage == "done" else "running..."),
-                w.kv_row("Collection", data.COLLECTION_NAME, is_mono=True),
+                w.kv_row("Collection", settingService.get(EMBEDDING_COLLECTION), is_mono=True),
             ],
             spacing=Space.MD,
         ),
@@ -414,7 +418,7 @@ def _impact():
         "What a reset touches",
         content=ft.Row(
             [
-                ft.Container(content=group("Wiped and rebuilt", WIPES, "danger"), expand=True),
+                ft.Container(content=group("Wiped and rebuilt", _wipes(), "danger"), expand=True),
                 ft.Container(content=group("Left untouched", KEEPS, "success"), expand=True),
             ],
             spacing=Space.XXL,
@@ -462,7 +466,7 @@ def _confirm(portal):
                 w.divider(bottom=Space.MD),
                 w.kv_row("Files to convert", data.STATS["source_files"]),
                 w.kv_row("Estimated duration", "~5 min"),
-                w.kv_row("Embedding model", data.EMBEDDING_MODEL, is_mono=True),
+                w.kv_row("Embedding model", settingService.get(EMBEDDING_MODEL), is_mono=True),
                 w.kv_row("Last reset", "6 days ago"),
             ],
             spacing=Space.MD,

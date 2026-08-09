@@ -1,10 +1,9 @@
-import components.FileManager
-import constant.paths
 import logging
 import shutil
 from pathlib import Path
 from components.FileManager import OutputFileFactory
-from constant.paths import INPUT_FILE_DIR, OUTPUT_FILE_DIR
+from constant.settings import PATHS_INPUT_DIR, PATHS_OUTPUT_DIR
+from services.SettingService import settingService
 
 logger = logging.getLogger(__name__)
 
@@ -12,13 +11,13 @@ class FileConverterService:
     def start_convert_files(self):
         logger.info("Start converting files")
         self._clear_existing_files()
-        total = self._get_file(INPUT_FILE_DIR)
+        total = self._get_file(settingService.get_path(PATHS_INPUT_DIR))
         logger.info("File conversion completed")
         logger.info("Total converted files: " + str(total))
 
     def sync_convert_files(self):
         logger.info("Start syncing files")
-        converted, skipped = self._sync_file(INPUT_FILE_DIR)
+        converted, skipped = self._sync_file(settingService.get_path(PATHS_INPUT_DIR))
         logger.info("File sync completed")
         logger.info(f"Converted files: {converted}, Skipped files: {skipped}")
         return converted, skipped
@@ -47,9 +46,10 @@ class FileConverterService:
         return converted, skipped
 
     def _clear_existing_files(self):
-        logger.info(f"Clearing: {OUTPUT_FILE_DIR}")
-        shutil.rmtree(OUTPUT_FILE_DIR)
-        output_main_folder_path = Path(OUTPUT_FILE_DIR)
+        output_file_dir = settingService.get_path(PATHS_OUTPUT_DIR)
+        logger.info(f"Clearing: {output_file_dir}")
+        shutil.rmtree(output_file_dir)
+        output_main_folder_path = Path(output_file_dir)
         if not output_main_folder_path.exists():
             output_main_folder_path.mkdir()
 

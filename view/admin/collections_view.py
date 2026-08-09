@@ -2,6 +2,8 @@
 
 import flet as ft
 
+from constant.settings import EMBEDDING_COLLECTION
+from services.SettingService import settingService
 from view import mock_data as data
 from view import widgets as w
 from view.theme import Radius, Space, palette
@@ -22,7 +24,7 @@ def build(portal):
         [
             w.page_header(
                 "Collections",
-                f"{len(data.DOCUMENTS)} documents embedded in {data.COLLECTION_NAME}.",
+                f"{len(data.DOCUMENTS)} documents embedded in {settingService.get(EMBEDDING_COLLECTION)}.",
                 actions=[
                     w.ghost_button(
                         "Refresh",

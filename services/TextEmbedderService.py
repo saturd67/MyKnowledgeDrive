@@ -3,20 +3,28 @@ import chromadb
 from chromadb.config import Settings
 from chromadb.utils import embedding_functions
 from pathlib import Path
-from constant.paths import CHROMA_STORE_DIR, INPUT_FILE_DIR, OUTPUT_FILE_DIR
+from constant.settings import (
+    EMBEDDING_COLLECTION,
+    EMBEDDING_MODEL,
+    EMBEDDING_RESULTS_PER_QUERY,
+    PATHS_CHROMA_STORE,
+    PATHS_OUTPUT_DIR,
+)
 from services.FileFetcherService import FileFetcherService
+from services.SettingService import settingService as app_settings
 
 logger = logging.getLogger(__name__)
 
 class TextEmbedderService:
 
     def __init__(self):
+        self.collection_name = app_settings.get(EMBEDDING_COLLECTION)
         self.chroma_client = chromadb.PersistentClient(
-            path=CHROMA_STORE_DIR,
+            path=app_settings.get_path(PATHS_CHROMA_STORE),
             settings=Settings(anonymized_telemetry=False)
         )
-        self.sentence_transformer = embedding_functions.SentenceTransformerEmbeddingFunction(model_name = 'all-MiniLM-L6-v2')
-        self.collection = self.chroma_client.get_or_create_collection(name="my_knowledge_drive", embedding_function=self.sentence_transformer)
+        self.sentence_transformer = embedding_functions.SentenceTransformerEmbeddingFunction(model_name = app_settings.get(EMBEDDING_MODEL))
+        self.collection = self.chroma_client.get_or_create_collection(name=self.collection_name, embedding_function=self.sentence_transformer)
 
     def embed_collection(self):
         logger.info("Start embedding files")
@@ -124,15 +132,15 @@ class TextEmbedderService:
 
     def reset_collection(self):
         logger.info("Clearing collection")
-        self.chroma_client.delete_collection(name="my_knowledge_drive")
-        self.collection = self.chroma_client.get_or_create_collection(name="my_knowledge_drive", embedding_function=self.sentence_transformer)
+        self.chroma_client.delete_collection(name=self.collection_name)
+        self.collection = self.chroma_client.get_or_create_collection(name=self.collection_name, embedding_function=self.sentence_transformer)
 
     def query(self, query):
         logger.info("Querying collection")
 
         results = self.collection.query(
             query_texts = [query],
-            n_results = 5,
+            n_results = app_settings.get_int(EMBEDDING_RESULTS_PER_QUERY),
             include = ["distances", "metadatas", "documents"],
         )
 
@@ -148,12 +156,13 @@ class TextEmbedderService:
 
     def get_files_content(self):
         logger.info("Getting files")
-        file_contents = self._get_files_content(OUTPUT_FILE_DIR)
+        output_file_dir = app_settings.get_path(PATHS_OUTPUT_DIR)
+        file_contents = self._get_files_content(output_file_dir)
 
 
         for file_content in file_contents:
             full_file_path = file_content.get('file')
-            start_index = full_file_path.find(OUTPUT_FILE_DIR) + len(OUTPUT_FILE_DIR) + 1
+            start_index = full_file_path.find(output_file_dir) + len(output_file_dir) + 1
             end_index = full_file_path.rfind('.')
             file_content['file'] = full_file_path[start_index:end_index]
 

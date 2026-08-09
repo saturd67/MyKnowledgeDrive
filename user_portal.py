@@ -1,6 +1,4 @@
-from numpy.ma.core import resize
-
-from constant.paths import OUTPUT_FILE_DIR
+from services.SettingService import settingService
 from services.TextEmbedderService import TextEmbedderService
 import os
 import logging
@@ -25,6 +23,7 @@ webbrowser.register("chrome", None, webbrowser.BackgroundBrowser(chrome_path))
 if __name__ == "__main__":
     logger.info("Starting user portal...")
 
+    settingService.initialise()
     text_embedder_service = TextEmbedderService()
 
     os.system("cls" if os.name == "nt" else "clear")

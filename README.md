@@ -68,9 +68,14 @@ view/
 components/
   FileManager.py          OutputFile subclasses (DocFile/ImageFile/OtherFile/UnknownFile) + factory
 constant/
-  paths.py                Shared path constants (BASE_DIR, INPUT_FILE_DIR,
-                          OUTPUT_FILE_DIR, CHROMA_STORE_DIR)
+  paths.py                BASE_DIR (install root) and DB_PATH
+  settings.py             Setting keys and the values the database is seeded with
+repository/
+  SettingRepository.py    Every SQL statement for the setting table
 services/
+  DatabaseService.py      SQLite connection and pragmas (no SQL of its own)
+  SettingService.py       Setting lookups, caching and path resolution
+                          (shared `settings` instance)
   FileFetcherService.py   Google Drive API: recursive (id, relative path) listing
   FileConverterService.py Orchestrates resources/files -> resources/converted_files
   TextEmbedderService.py  Chroma collection: embed / reset / check / query
@@ -78,11 +83,12 @@ resources/
   files/                  Local mirror of the Drive folder (gitignored, input)
   converted_files/        Converted plain-text output (gitignored, generated)
   my_chroma_store/        Chroma's persistent vector DB files (gitignored, generated)
+  knowledge_drive.db      SQLite database (gitignored, generated on first run)
 existing_file_types       Reference notes: MIME type -> conversion pipeline
 run_admin_portal.bat      Windows launcher for admin_portal.py
 run_user_portal.bat       Windows launcher for user_portal.py
 run_user_portal_ui.bat    Windows launcher for my_knowledge_base_portal.py
-plans/                    Design docs for features (sync-collections-plan.md is now implemented)
+plans/                    Design docs, one per table/feature (settings-table.md is implemented)
 ```
 
 ## Prerequisites
@@ -93,8 +99,9 @@ plans/                    Design docs for features (sync-collections-plan.md is 
   embedded in `.docx` files.
 - A Google Cloud **service account** with read-only access to the target
   Drive folder, with its JSON key saved at
-  `C:/secrets/my_knowledge_drive_service_account.json` (path is hardcoded in
-  `services/FileFetcherService.py`, along with the target `FOLDER_ID`).
+  `C:/secrets/my_knowledge_drive_service_account.json`. That path and the
+  target folder id are settings — seeded into `resources/knowledge_drive.db`
+  on first run and editable from the admin portal's Settings screen.
 - Google Chrome installed at the default Windows path — `user_portal.py`
   opens search results in Chrome using a hardcoded profile (`"Profile 1"`).
 - `flet==0.28.3` and `flet-desktop==0.28.3` (already installed in `.venv`) —
@@ -136,10 +143,10 @@ Picking one opens `https://drive.google.com/file/d/<id>` in Chrome.
 run_user_portal_ui.bat
 ```
 
-A Flet rewrite of both portals. **It is presentation only** — every screen
-renders from `view/mock_data.py` and no button calls into the services yet.
-Actions show a "not wired up yet" toast and are marked with a `TODO` pointing
-at the CLI method they should eventually call.
+A Flet rewrite of both portals. **Settings is wired to the database; every
+other screen is still presentation only** — they render from
+`view/mock_data.py`, and their actions show a "not wired up yet" toast marked
+with a `TODO` pointing at the CLI method they should eventually call.
 
 One launcher covers both portals: it opens on the user portal, and a narrow
 rail down the far-left edge switches to the admin portal in place.
@@ -148,8 +155,9 @@ rail down the far-left edge switches to the admin portal in place.
   filterable, paginated table of `id`/`label`), *Sync & Reset* (one screen with
   a mode switch — sync shows the step list, run summary and log; reset swaps in
   the danger banner, impact breakdown, type-`RESET`-to-confirm gate and
-  confirmation dialog), *Settings* (editable paths and Drive config, read-only
-  embedding config).
+  confirmation dialog), *Settings* (reads and writes the `setting` table —
+  editable paths, Drive config and results-per-query, with per-section
+  Save/Revert; model and collection name are shown read-only).
 - **User UI** — a search-history sidebar on the left, a centred landing screen,
   and the query field docked along the bottom; submitting swaps the landing
   screen for a ranked result list showing relevance and cosine distance,

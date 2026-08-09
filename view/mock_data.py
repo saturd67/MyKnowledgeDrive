@@ -1,26 +1,12 @@
 """Placeholder data used to lay out the portals.
 
-Nothing here touches the services yet - every screen renders from these
-constants so the UI can be reviewed without a Drive connection, a Chroma
-store or an embedding model.
+The Collections, Sync & Reset and search screens still render from these
+constants so they can be reviewed without a Drive connection, a Chroma store
+or an embedding model.
+
+Configuration is no longer mocked - it lives in the setting table and is read
+through services/SettingService.py.
 """
-
-from constant.paths import BASE_DIR, CHROMA_STORE_DIR, INPUT_FILE_DIR, OUTPUT_FILE_DIR
-
-# Mirrors the values currently hardcoded in the services.
-COLLECTION_NAME = "my_knowledge_drive"
-CHROMA_STORE_PATH = CHROMA_STORE_DIR
-EMBEDDING_MODEL = "all-MiniLM-L6-v2"
-DRIVE_FOLDER_ID = "1VWtBJ4KClTf7v8ULab7VN-45QK-au0DO"
-SERVICE_ACCOUNT_FILE = "C:/secrets/my_knowledge_drive_service_account.json"
-RESULTS_PER_QUERY = 5
-
-PATHS = {
-    "Base directory": BASE_DIR,
-    "Source files": INPUT_FILE_DIR,
-    "Converted files": OUTPUT_FILE_DIR,
-    "Chroma store": CHROMA_STORE_PATH,
-}
 
 STATS = {
     "embedded": "312",

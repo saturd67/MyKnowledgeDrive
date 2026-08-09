@@ -1,7 +1,5 @@
-from constant.paths import INPUT_FILE_DIR, BASE_DIR
-from pathlib import Path
-from components.FileManager import OutputFileFactory
 from services.FileFetcherService import FileFetcherService
+from services.SettingService import settingService
 
 import logging
 
@@ -15,6 +13,7 @@ logging.basicConfig(
 
 
 if __name__ == "__main__":
+    settingService.initialise()
     file_fetcher_service = FileFetcherService()
     results = file_fetcher_service.start_file_id_fetching()
     for result in results:

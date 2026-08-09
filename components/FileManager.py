@@ -6,34 +6,35 @@ from PIL import Image
 import mammoth
 import base64
 import pytesseract
-import constant.paths
 import logging
 import mimetypes
-from constant.paths import OUTPUT_FILE_DIR, INPUT_FILE_DIR
+from constant.settings import PATHS_INPUT_DIR, PATHS_OUTPUT_DIR
+from services.SettingService import settingService
 
 logger = logging.getLogger(__name__)
 
 class OutputFile(ABC):
     def __init__(self, file_path):
-        self.path = file_path[(file_path.find(INPUT_FILE_DIR) + len(INPUT_FILE_DIR)):file_path.rfind("\\")]
+        input_file_dir = settingService.get_path(PATHS_INPUT_DIR)
+        self.path = file_path[(file_path.find(input_file_dir) + len(input_file_dir)):file_path.rfind("\\")]
         self.filename = file_path[file_path.rfind("\\") + 1:]
 
     def get_file_path(self):
         return self.path + "\\" + self.filename
 
     def get_full_path(self):
-        return INPUT_FILE_DIR + "\\" + self.path + "\\" + self.filename
+        return settingService.get_path(PATHS_INPUT_DIR) + "\\" + self.path + "\\" + self.filename
 
     def get_output_file_path(self):
         relative_file = self.get_file_path().rsplit(".", 1)[0]
-        return OUTPUT_FILE_DIR + "\\" + relative_file + ".txt"
+        return settingService.get_path(PATHS_OUTPUT_DIR) + "\\" + relative_file + ".txt"
 
     @abstractmethod
     def convert(self):
         pass
 
     def _generate_file(self, file_content):
-        output_path = Path(OUTPUT_FILE_DIR + "\\" + self.path)
+        output_path = Path(settingService.get_path(PATHS_OUTPUT_DIR) + "\\" + self.path)
         if not output_path.exists():
             logger.info(f"Output path does not exists: {output_path}")
             logger.info(f"Creating output path: {output_path}")

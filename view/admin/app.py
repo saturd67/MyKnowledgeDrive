@@ -30,6 +30,7 @@ class AdminPortal:
             "sync_mode": "sync",     # sync | reset
             "sync_stage": "idle",
             "reset_confirm": "",
+            "settings_edits": {},    # key -> unsaved value
         }
         self._body = ft.Container(expand=True)
 

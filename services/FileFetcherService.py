@@ -4,24 +4,25 @@ from googleapiclient.discovery import build
 from googleapiclient.http import MediaIoBaseDownload
 from google.oauth2.service_account import Credentials
 
-from constant.paths import OUTPUT_FILE_DIR
+from constant.settings import DRIVE_FOLDER_ID, DRIVE_SCOPE, DRIVE_SERVICE_ACCOUNT_FILE
+from services.SettingService import settingService
 
 logger = logging.getLogger(__name__)
 
 class FileFetcherService:
     FOLDER_MIME_TYPE = "application/vnd.google-apps.folder"
 
-    SCOPES = ["https://www.googleapis.com/auth/drive.readonly"]
-    SERVICE_ACCOUNT_FILE = "C:/secrets/my_knowledge_drive_service_account.json"
-
-    creds = Credentials.from_service_account_file(
-        SERVICE_ACCOUNT_FILE, scopes=SCOPES
-    )
-
-    FOLDER_ID = "1VWtBJ4KClTf7v8ULab7VN-45QK-au0DO"
+    def __init__(self):
+        # Read on construction, not at import time - the credentials file is
+        # configurable now, and a missing one should fail the run, not the import.
+        self.folder_id = settingService.get(DRIVE_FOLDER_ID)
+        self.creds = Credentials.from_service_account_file(
+            settingService.get_path(DRIVE_SERVICE_ACCOUNT_FILE),
+            scopes=[settingService.get(DRIVE_SCOPE)]
+        )
 
     def start_file_id_fetching(self):
-        file_id_paths = self._get_file_id("", FileFetcherService.FOLDER_ID)
+        file_id_paths = self._get_file_id("", self.folder_id)
         return file_id_paths
 
     def _get_file_id(self, parent_path, file_id):
