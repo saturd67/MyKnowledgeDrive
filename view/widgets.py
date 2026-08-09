@@ -184,25 +184,31 @@ def page_header(heading, description, actions=None):
 
 
 def stat_card(icon, caption, value, hint=None, tone_name="primary", expand=True):
+    """Compact tile: badge on the left, figure and label stacked beside it."""
     p = palette()
     fg, _ = tone(tone_name)
+
+    label_row = [ft.Text(caption, size=11, weight=ft.FontWeight.W_600, color=p.text_muted)]
+    if hint:
+        label_row.append(ft.Text(hint, size=11, color=fg))
+
     return card(
-        ft.Column(
+        ft.Row(
             [
-                ft.Row(
+                icon_badge(icon, tone_name, size=34, icon_size=16),
+                ft.Column(
                     [
-                        icon_badge(icon, tone_name, size=38, icon_size=18),
-                        ft.Container(expand=True),
-                    ]
+                        ft.Text(value, size=19, weight=ft.FontWeight.W_700, color=p.text),
+                        ft.Row(label_row, spacing=Space.SM),
+                    ],
+                    spacing=0,
+                    expand=True,
                 ),
-                ft.Container(height=Space.LG),
-                ft.Text(value, size=28, weight=ft.FontWeight.W_700, color=p.text),
-                ft.Text(caption, size=12, weight=ft.FontWeight.W_600, color=p.text_muted),
-                ft.Text(hint or "", size=11, color=fg) if hint else ft.Container(),
             ],
-            spacing=2,
+            spacing=Space.MD,
+            vertical_alignment=ft.CrossAxisAlignment.CENTER,
         ),
-        padding=Space.XL,
+        padding=Space.MD,
         expand=expand,
     )
 
