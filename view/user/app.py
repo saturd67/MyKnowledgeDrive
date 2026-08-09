@@ -9,7 +9,7 @@ from view import mock_data as data
 from view import portal_rail
 from view import theme
 from view import widgets as w
-from view.theme import Radius, Space, palette
+from view.theme import Space, palette
 from view.user import search_view
 
 
@@ -63,16 +63,7 @@ class UserPortal:
     # --- helpers available to the screen -------------------------------------
 
     def notify(self, message, tone_name="neutral"):
-        fg, bg = theme.tone(tone_name)
-        self.page.open(
-            ft.SnackBar(
-                content=ft.Text(message, color=fg, size=13, weight=ft.FontWeight.W_600),
-                bgcolor=bg,
-                behavior=ft.SnackBarBehavior.FLOATING,
-                shape=ft.RoundedRectangleBorder(radius=Radius.MD),
-                duration=2600,
-            )
-        )
+        self.page.open(w.snack_bar(self.page, message, tone_name))
 
     def not_implemented(self, feature):
         # TODO: wire to TextEmbedderService.query() / webbrowser in user_portal.py

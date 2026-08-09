@@ -71,16 +71,7 @@ class AdminPortal:
     # --- helpers available to the screens ------------------------------------
 
     def notify(self, message, tone_name="neutral"):
-        fg, bg = theme.tone(tone_name)
-        self.page.open(
-            ft.SnackBar(
-                content=ft.Text(message, color=fg, size=13, weight=ft.FontWeight.W_600),
-                bgcolor=bg,
-                behavior=ft.SnackBarBehavior.FLOATING,
-                shape=ft.RoundedRectangleBorder(radius=Radius.MD),
-                duration=2600,
-            )
-        )
+        self.page.open(w.snack_bar(self.page, message, tone_name))
 
     def not_implemented(self, feature):
         # TODO: wire to the matching Action method in admin_portal.py
