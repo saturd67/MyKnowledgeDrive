@@ -178,7 +178,3 @@ class AdminPortal:
             ],
             spacing=Space.XS,
         )
-
-
-def main(page):
-    AdminPortal(page).start()

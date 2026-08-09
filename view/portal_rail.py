@@ -61,10 +61,7 @@ def switch(page, target):
     The window keeps whatever size the user has given it - only the launcher
     sets the geometry.
     """
+    from view.main import start
+
     page.controls.clear()
-    if target == "admin":
-        from view.admin.app import AdminPortal
-        AdminPortal(page).start(set_window=False)
-    else:
-        from view.user.app import UserPortal
-        UserPortal(page).start(set_window=False)
+    start(page, target, set_window=False)

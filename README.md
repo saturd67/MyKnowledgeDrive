@@ -58,6 +58,7 @@ user_portal.py            Interactive CLI to search it and open results
 my_knowledge_base_portal.py  Flet entry point for the desktop UI (both portals)
 main.py                   Standalone script: lists Drive file IDs/paths (debug utility)
 view/
+  main.py                 Front door: `main` (Flet target) and `start(page, portal)`
   theme.py                Palette, spacing/radius tokens, the Flet theme (light only)
   portal_rail.py          Far-left rail that swaps between the admin and user portals
   widgets.py              Shared presentational controls (cards, pills, log console, ...)

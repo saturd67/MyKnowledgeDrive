@@ -7,7 +7,7 @@ layouts, and the CLI portals for the code that still does the real work.
 
 import flet as ft
 
-from view.user.app import main
+from view.main import main
 
 if __name__ == "__main__":
     ft.app(target=main)

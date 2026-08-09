@@ -178,7 +178,3 @@ class UserPortal:
             selected=active,
             bordered=False,
         )
-
-
-def main(page):
-    UserPortal(page).start()
