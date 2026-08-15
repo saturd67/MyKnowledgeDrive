@@ -308,39 +308,92 @@ def empty_state(icon, heading, message, action=None, height=260):
     )
 
 
+LOG_LEVEL_COLORS = {
+    "INFO": "info",
+    "WARN": "warning",
+    "ERROR": "danger",
+    "DONE": "success",
+}
+
+
+def log_line(timestamp, level, message):
+    """One console row.
+
+    Built separately from `log_console` so a running job can append a single
+    line to the console's column instead of rebuilding every row.
+    """
+    p = palette()
+    fg, _ = tone(LOG_LEVEL_COLORS.get(level, "neutral"))
+    return ft.Row(
+        [
+            mono(timestamp, size=11, color=p.text_faint),
+            ft.Container(content=mono(level, size=10, color=fg), width=46),
+            ft.Container(content=mono(message, size=11, color=p.text_muted), expand=True),
+        ],
+        spacing=Space.MD,
+    )
+
+
 def log_console(lines, height=240):
     """Read-only console block used by the sync and reset screens."""
     p = palette()
-    level_colors = {
-        "INFO": p.info,
-        "WARN": p.warning,
-        "ERROR": p.danger,
-        "DONE": p.success,
-    }
-
-    rows = []
-    for timestamp, level, message in lines:
-        rows.append(
-            ft.Row(
-                [
-                    mono(timestamp, size=11, color=p.text_faint),
-                    ft.Container(
-                        content=mono(level, size=10, color=level_colors.get(level, p.text_muted)),
-                        width=46,
-                    ),
-                    ft.Container(content=mono(message, size=11, color=p.text_muted), expand=True),
-                ],
-                spacing=Space.MD,
-            )
-        )
-
     return ft.Container(
-        content=ft.Column(rows, spacing=6, scroll=ft.ScrollMode.AUTO),
+        content=ft.Column(
+            [log_line(*line) for line in lines],
+            spacing=6,
+            scroll=ft.ScrollMode.AUTO,
+        ),
         height=height,
         padding=Space.LG,
         bgcolor=p.surface_alt,
         border=ft.border.all(1, p.border_soft),
         border_radius=Radius.MD,
+    )
+
+
+CHECK_WIDTH = 30
+
+
+def check_row(checked, content, on_change=None, tristate=False, disabled=False, spacing=Space.MD):
+    """A palette-styled checkbox against arbitrary row content.
+
+    `checked` is None for the indeterminate state, which only makes sense
+    together with `tristate`.
+    """
+    p = palette()
+    box = ft.Checkbox(
+        value=checked,
+        tristate=tristate,
+        disabled=disabled,
+        on_change=on_change,
+        fill_color={
+            ft.ControlState.SELECTED: p.primary,
+            ft.ControlState.DEFAULT: "transparent",
+            ft.ControlState.DISABLED: p.surface_high,
+        },
+        check_color=p.on_primary,
+        border_side=ft.BorderSide(1.4, p.border if disabled else p.text_faint),
+        splash_radius=0,
+        visual_density=ft.VisualDensity.COMPACT,
+        scale=0.85,
+    )
+    row = ft.Row(
+        [ft.Container(content=box, width=CHECK_WIDTH), content],
+        spacing=spacing,
+        vertical_alignment=ft.CrossAxisAlignment.CENTER,
+    )
+    # The checkbox is published on `data` so a caller can retick it on its own
+    # without rebuilding the screen.
+    row.data = box
+    return row
+
+
+def check_spacer(content, spacing=Space.MD):
+    """Row indented to line up with `check_row`, but with no checkbox."""
+    return ft.Row(
+        [ft.Container(width=CHECK_WIDTH), content],
+        spacing=spacing,
+        vertical_alignment=ft.CrossAxisAlignment.CENTER,
     )
 
 

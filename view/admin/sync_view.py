@@ -2,7 +2,16 @@
 
 Both share this screen - the mode switch swaps the step list, the side panel
 and the log, so the two runs read the same way.
+
+Sync is two-phase: a scan reports what changed per file, you tick what you
+want, and only the ticked files are updated. Running the lot is still one
+click away - select all, then update.
+
+The scan and update runs are stubbed with a scripted delay for now; the
+stage machine, the grouping and the selection are the real thing.
 """
+
+import time
 
 import flet as ft
 
@@ -19,11 +28,16 @@ MODES = [
     ("reset", "Reset", ft.Icons.RESTART_ALT_ROUNDED),
 ]
 
-SYNC_STAGES = [
-    ("Convert changed files", "Only files newer than their converted .txt are reconverted."),
+SCAN_STAGES = [
+    ("Walk the local mirror", "Compares each source file's mtime to its converted .txt."),
     ("Fetch Drive listing", "Recursive read-only walk of the configured Drive folder."),
-    ("Diff by modifiedTime", "Split the listing into added, updated and removed documents."),
-    ("Upsert and delete", "Write the delta into the Chroma collection."),
+    ("Diff against the collection", "Splits the listing into added, updated, removed and unchanged."),
+]
+
+APPLY_STAGES = [
+    ("Convert selected files", "Only the ticked files are reconverted."),
+    ("Embed and upsert", "Writes the selected documents into the Chroma collection."),
+    ("Delete removed", "Drops the ticked documents that are no longer on Drive."),
 ]
 
 RESET_STAGES = [
@@ -32,6 +46,62 @@ RESET_STAGES = [
     ("Drop the collection", "The Chroma collection is deleted and recreated."),
     ("Re-embed everything", "All converted text is embedded back into the store."),
 ]
+
+# status -> (row label, tone, group)
+STATUS_META = {
+    "added": ("New", "success", "add"),
+    "updated": ("Drive changed", "info", "update"),
+    "stale_local": ("Local edit", "info", "update"),
+    "removed": ("Gone from Drive", "warning", "remove"),
+    "no_drive_id": ("No Drive id", "danger", "blocked"),
+    "no_source": ("No source file", "danger", "blocked"),
+    "unsupported": ("Unsupported", "danger", "blocked"),
+    "unchanged": ("In sync", "neutral", "unchanged"),
+}
+
+# key, heading, description, tone, tickable, select-all allowed
+GROUPS = [
+    ("add", "Add", "Not in the collection yet.", "success", True, True),
+    ("update", "Update", "Drive moved on, or the local mirror was edited.", "info", True, True),
+    ("remove", "Remove", "No longer on Drive. Ticking one deletes its embedding.",
+     "warning", True, False),
+    ("blocked", "Blocked", "These cannot be updated - the reason is on each row.",
+     "danger", False, False),
+    ("unchanged", "Unchanged", "Already up to date.", "neutral", False, False),
+]
+
+BLOCKED_REASONS = {
+    "no_drive_id": "Not on Drive, so it has no id and can never be embedded.",
+    "no_source": "On Drive, but there is no local file to convert.",
+    "unsupported": "The converter skips this extension.",
+}
+
+STATUS_FILTERS = [("all", "All changes")] + [(key, heading) for key, heading, *_ in GROUPS]
+
+# Unchanged is the long tail - show a slice until asked for the rest.
+UNCHANGED_PREVIEW = 50
+
+# Removing more than this share of the collection in one go is worth a warning.
+REMOVE_WARN_RATIO = 0.2
+
+SCAN_SCRIPT = [
+    ("INFO", "Walking resources\\files"),
+    ("INFO", "Comparing source mtimes against converted_files"),
+    ("INFO", "Fetching Drive file ids"),
+    ("WARN", "Skip unknown file: resources\\files\\Format PC\\Tools\\rufus-4.1.exe"),
+    ("INFO", "Reading collection metadata"),
+    ("DONE", "Scan completed - 4 added, 6 updated, 2 removed, 2 local edits"),
+]
+
+APPLY_SCRIPT = [
+    ("INFO", "Converting (changed): resources\\files\\Docker\\Docker General Notes.docx"),
+    ("INFO", "Converting image to text: \\Git\\Git Flow.png"),
+    ("INFO", "Converting (changed): resources\\files\\Nginx\\Proxy.docx"),
+    ("INFO", "Loading the embedding model"),
+    ("INFO", "Upserting documents into the collection"),
+    ("DONE", "Update completed"),
+]
+
 
 def _wipes():
     """Built per render - the collection name is read from the setting table."""
@@ -52,46 +122,91 @@ def build(portal):
     mode = portal.state["sync_mode"]
     stage = portal.state["sync_stage"]
 
+    # `refs` collects the few controls a checkbox toggle updates in place, so
+    # ticking a row never rebuilds the whole list.
+    refs = {}
+
     heading, description = {
         "sync": ("Sync collections",
-                 "The everyday run - reconverts what changed and reconciles the vector store."),
+                 "Scan for what changed, then update only the files you pick."),
         "reset": ("Reset collections",
                   "Full rebuild - use it for a first run or when the store is out of sync."),
     }[mode]
 
     children = [
-        w.page_header(
-            heading,
-            description,
-            actions=[_state_preview(portal), _run_button(portal, mode, stage)],
-        ),
+        w.page_header(heading, description, actions=[_run_button(portal, mode, stage, refs)]),
         ft.Container(height=Space.LG),
         _mode_switch(portal),
         ft.Container(height=Space.XL),
     ]
 
     if mode == "reset":
-        children += [_warning_banner(), ft.Container(height=Space.LG)]
+        children += [
+            _warning_banner(),
+            ft.Container(height=Space.LG),
+            ft.Row(
+                [
+                    ft.Container(
+                        content=_steps(RESET_STAGES, portal, "danger", "Pipeline steps",
+                                       "What a full rebuild does, in order."),
+                        expand=3,
+                    ),
+                    ft.Container(content=_confirm(portal), expand=2),
+                ],
+                spacing=Space.LG,
+                vertical_alignment=ft.CrossAxisAlignment.START,
+            ),
+            ft.Container(height=Space.LG),
+            _impact(),
+            ft.Container(height=Space.LG),
+            _console(portal, mode),
+        ]
+        return ft.Column(children, spacing=0)
 
-    children += [
-        ft.Row(
-            [
-                ft.Container(content=_steps(mode, stage), expand=3),
-                ft.Container(
-                    content=_confirm(portal) if mode == "reset" else _summary(stage),
-                    expand=2,
+    if stage in ("idle", "scanning"):
+        children += [
+            ft.Row(
+                [
+                    ft.Container(
+                        content=_steps(SCAN_STAGES, portal, "primary", "Scan steps",
+                                       "What a scan looks at, in order. Nothing is written."),
+                        expand=3,
+                    ),
+                    ft.Container(content=_summary(portal), expand=2),
+                ],
+                spacing=Space.LG,
+                vertical_alignment=ft.CrossAxisAlignment.START,
+            ),
+            ft.Container(height=Space.LG),
+        ]
+    else:
+        if stage == "updating":
+            children += [
+                ft.Row(
+                    [
+                        ft.Container(
+                            content=_steps(APPLY_STAGES, portal, "primary", "Update steps",
+                                           "What happens to the files you picked."),
+                            expand=3,
+                        ),
+                        ft.Container(content=_summary(portal), expand=2),
+                    ],
+                    spacing=Space.LG,
+                    vertical_alignment=ft.CrossAxisAlignment.START,
                 ),
-            ],
-            spacing=Space.LG,
-            vertical_alignment=ft.CrossAxisAlignment.START,
-        ),
-        ft.Container(height=Space.LG),
-    ]
+                ft.Container(height=Space.LG),
+            ]
+        else:
+            children += [_scan_strip(portal), ft.Container(height=Space.LG)]
 
-    if mode == "reset":
-        children += [_impact(), ft.Container(height=Space.LG)]
+        children += [
+            _counts(portal),
+            ft.Container(height=Space.LG),
+            _results(portal, refs),
+            ft.Container(height=Space.LG),
+        ]
 
-    children.append(_console(mode, stage))
+    children.append(_console(portal, mode))
 
     return ft.Column(children, spacing=0)
 
@@ -100,6 +215,7 @@ def build(portal):
 
 def _mode_switch(portal):
     p = palette()
+    busy = portal.state["sync_stage"] in ("scanning", "updating")
 
     def select(key):
         def handler(_):
@@ -111,6 +227,8 @@ def _mode_switch(portal):
     for key, text, icon in MODES:
         active = key == portal.state["sync_mode"]
         fg = p.primary if (active and key == "sync") else (p.danger if active else p.text_muted)
+        if busy and not active:
+            fg = p.text_faint
         buttons.append(
             ft.Container(
                 content=ft.Row(
@@ -125,8 +243,9 @@ def _mode_switch(portal):
                 bgcolor=p.surface if active else "transparent",
                 border=ft.border.all(1, p.border if active else "transparent"),
                 border_radius=Radius.SM,
-                on_click=None if active else select(key),
-                ink=not active,
+                on_click=None if (active or busy) else select(key),
+                ink=not (active or busy),
+                tooltip="Finish the current run first" if busy and not active else None,
             )
         )
 
@@ -143,17 +262,18 @@ def _mode_switch(portal):
     )
 
 
-def _run_button(portal, mode, stage):
-    if stage == "running":
+def _run_button(portal, mode, stage, refs):
+    p = palette()
+
+    if stage in ("scanning", "updating"):
         return w.ghost_button(
             "Cancel",
             icon=ft.Icons.STOP_ROUNDED,
             tone_name="danger",
-            on_click=lambda _: portal.not_implemented("Cancel run"),
+            on_click=lambda _: _cancel(portal),
         )
 
     if mode == "reset":
-        p = palette()
         armed = portal.state["reset_confirm"].strip() == CONFIRM_WORD
         return ft.FilledButton(
             text="Reset collections",
@@ -169,51 +289,59 @@ def _run_button(portal, mode, stage):
             ),
         )
 
-    return w.primary_button(
-        "Start sync",
+    if stage == "idle":
+        return w.primary_button(
+            "Scan for changes",
+            icon=ft.Icons.MANAGE_SEARCH_ROUNDED,
+            on_click=lambda _: _scan(portal),
+        )
+
+    if stage == "done":
+        return w.primary_button(
+            "Scan again",
+            icon=ft.Icons.REFRESH_ROUNDED,
+            on_click=lambda _: _scan(portal),
+        )
+
+    # reviewing - the label carries the live selection count.
+    selected = len(portal.state["scan_selected"])
+    button = ft.FilledButton(
+        text=_run_label(selected),
         icon=ft.Icons.PLAY_ARROW_ROUNDED,
-        on_click=lambda _: portal.not_implemented("Sync collections"),
-    )
-
-
-def _state_preview(portal):
-    """Lets the UI be reviewed in each state while the actions are still stubs."""
-    p = palette()
-
-    def on_change(e):
-        portal.state["sync_stage"] = e.control.value
-        portal.refresh()
-
-    return ft.Container(
-        content=ft.Dropdown(
-            value=portal.state["sync_stage"],
-            options=[
-                ft.dropdown.Option("idle", "Preview: idle"),
-                ft.dropdown.Option("running", "Preview: running"),
-                ft.dropdown.Option("done", "Preview: completed"),
-            ],
-            width=180,
-            text_size=12,
-            dense=True,
-            content_padding=ft.padding.symmetric(horizontal=Space.MD, vertical=0),
-            filled=True,
-            fill_color=p.surface_alt,
-            border_color=p.border,
-            focused_border_color=p.primary,
-            border_radius=Radius.MD,
-            on_change=on_change,
+        disabled=selected == 0,
+        on_click=lambda _: _update(portal),
+        style=ft.ButtonStyle(
+            bgcolor={ft.ControlState.DEFAULT: p.primary, ft.ControlState.DISABLED: p.surface_high},
+            color={ft.ControlState.DEFAULT: p.on_primary, ft.ControlState.DISABLED: p.text_faint},
+            padding=ft.padding.symmetric(horizontal=Space.XL, vertical=Space.LG),
+            shape=ft.RoundedRectangleBorder(radius=Radius.MD),
+            text_style=ft.TextStyle(size=13, weight=ft.FontWeight.W_600),
         ),
-        height=42,
     )
+    refs["run"] = button
+    return button
+
+
+def _run_label(selected):
+    if selected == 0:
+        return "Nothing selected"
+    return f"Update {selected} selected"
 
 
 # --- shared blocks ----------------------------------------------------------
 
-def _steps(mode, stage):
+def _steps(stages, portal, accent, heading, description):
     p = palette()
-    stages = SYNC_STAGES if mode == "sync" else RESET_STAGES
-    accent = "primary" if mode == "sync" else "danger"
-    active_index = {"idle": -1, "running": 1, "done": len(stages)}[stage]
+    stage = portal.state["sync_stage"]
+    progress = portal.state["sync_progress"]
+
+    if stage in ("idle", "reviewing"):
+        active_index = -1
+    elif stage == "done":
+        active_index = len(stages)
+    else:
+        fraction = progress[1] if progress else 0.0
+        active_index = min(int(fraction * len(stages)), len(stages) - 1)
 
     rows = []
     for index, (name, description) in enumerate(stages):
@@ -248,41 +376,40 @@ def _steps(mode, stage):
             )
         )
 
-    progress = {
-        "idle": ("Waiting to start", 0.0, "neutral"),
-        "running": (f"Step 2 of {len(stages)}", 0.45, accent),
-        "done": ("Completed in 24s" if mode == "sync" else "Completed in 5m 27s", 1.0, "success"),
-    }[stage]
+    if progress:
+        caption, fraction = progress
+        bar = w.progress_row(caption, fraction, accent)
+    elif stage == "done":
+        bar = w.progress_row("Completed", 1.0, "success")
+    else:
+        bar = w.progress_row("Waiting to start", 0.0, "neutral")
 
     return w.section(
-        "Pipeline steps",
-        "What a sync run does, in order." if mode == "sync"
-        else "What a full rebuild does, in order.",
+        heading,
+        description,
         trailing=_status_pill(stage, accent),
-        content=ft.Column(
-            [
-                ft.Column(rows, spacing=Space.LG),
-                w.divider(),
-                w.progress_row(progress[0], progress[1], progress[2]),
-            ],
-            spacing=0,
-        ),
+        content=ft.Column([ft.Column(rows, spacing=Space.LG), w.divider(), bar], spacing=0),
     )
 
 
 def _status_pill(stage, accent):
     mapping = {
         "idle": ("Idle", "neutral", ft.Icons.PAUSE_CIRCLE_OUTLINE_ROUNDED),
-        "running": ("Running", accent, ft.Icons.AUTORENEW_ROUNDED),
+        "scanning": ("Scanning", accent, ft.Icons.AUTORENEW_ROUNDED),
+        "reviewing": ("Waiting on you", "info", ft.Icons.CHECKLIST_ROUNDED),
+        "updating": ("Updating", accent, ft.Icons.AUTORENEW_ROUNDED),
         "done": ("Completed", "success", ft.Icons.CHECK_CIRCLE_ROUNDED),
     }
     text, tone_name, icon = mapping[stage]
     return w.pill(text, tone_name, icon)
 
 
-def _console(mode, stage):
-    log = data.SYNC_LOG if mode == "sync" else data.RESET_LOG
-    lines = [] if stage == "idle" else log[:6] if stage == "running" else log
+def _console(portal, mode):
+    if mode == "reset":
+        lines = data.RESET_LOG if portal.state["sync_stage"] == "done" else []
+    else:
+        lines = portal.state["sync_log"]
+
     content = (
         w.log_console(lines)
         if lines
@@ -301,58 +428,715 @@ def _console(mode, stage):
     )
 
 
+# --- scan results -----------------------------------------------------------
+
+def _group_of(change):
+    return STATUS_META[change["status"]][2]
+
+
+def _selectable(change):
+    group = _group_of(change)
+    return group in ("add", "update", "remove")
+
+
+def _in_group(portal, group_key):
+    return [c for c in portal.state["scan_changes"] if _group_of(c) == group_key]
+
+
+def _visible(portal, changes):
+    needle = portal.state["scan_filter"].strip().lower()
+    if not needle:
+        return changes
+    return [c for c in changes if needle in c["key"].lower()]
+
+
+def _scan_strip(portal):
+    stats = portal.state["scan_stats"] or {}
+    return w.card(
+        ft.Row(
+            [
+                ft.Container(content=w.kv_row("Scanned at", stats.get("scanned_at", "-")), expand=True),
+                ft.Container(content=w.kv_row("Files walked", stats.get("walked", "-")), expand=True),
+                ft.Container(content=w.kv_row("Duration", stats.get("duration", "-")), expand=True),
+            ],
+            spacing=Space.LG,
+        ),
+        padding=Space.MD,
+    )
+
+
+def _counts(portal):
+    changes = portal.state["scan_changes"]
+    result = portal.state["sync_result"]
+
+    if result:
+        tiles = [
+            (ft.Icons.ADD_CIRCLE_ROUNDED, "Added", str(result["added"]), "success"),
+            (ft.Icons.CHANGE_CIRCLE_ROUNDED, "Updated", str(result["updated"]), "info"),
+            (ft.Icons.REMOVE_CIRCLE_ROUNDED, "Removed", str(result["removed"]), "warning"),
+            (ft.Icons.CHECK_CIRCLE_ROUNDED, "Skipped", str(result["skipped"]), "neutral"),
+        ]
+    else:
+        by_group = {}
+        for change in changes:
+            by_group[_group_of(change)] = by_group.get(_group_of(change), 0) + 1
+        tiles = [
+            (ft.Icons.ADD_CIRCLE_ROUNDED, "To add", str(by_group.get("add", 0)), "success"),
+            (ft.Icons.CHANGE_CIRCLE_ROUNDED, "To update", str(by_group.get("update", 0)), "info"),
+            (ft.Icons.REMOVE_CIRCLE_ROUNDED, "To remove", str(by_group.get("remove", 0)), "warning"),
+            (ft.Icons.BLOCK_ROUNDED, "Blocked", str(by_group.get("blocked", 0)), "danger"),
+        ]
+
+    return ft.Row(
+        [w.stat_card(icon, caption, value, None, tone_name) for icon, caption, value, tone_name in tiles],
+        spacing=Space.LG,
+    )
+
+
+def _results(portal, refs):
+    changes = portal.state["scan_changes"]
+    if not changes:
+        return w.section(
+            "Changes",
+            content=w.empty_state(
+                ft.Icons.RULE_ROUNDED,
+                "Nothing to review",
+                "The scan found no files. Check the input directory in Settings.",
+            ),
+        )
+
+    wanted = portal.state["scan_status_filter"]
+    blocks = []
+    for group_key, heading, description, tone_name, tickable, allow_all in GROUPS:
+        if wanted != "all" and wanted != group_key:
+            continue
+        rows = _in_group(portal, group_key)
+        if not rows:
+            continue
+        blocks.append(_group(portal, refs, group_key, heading, description,
+                             tone_name, tickable, allow_all, rows))
+
+    if not blocks:
+        body = w.empty_state(
+            ft.Icons.SEARCH_OFF_ROUNDED,
+            "Nothing matches that filter",
+            "Try a shorter path fragment, or switch the status filter back to all.",
+        )
+    else:
+        body = ft.Column(blocks, spacing=Space.LG)
+
+    return w.section(
+        "Changes",
+        f"{len(changes)} files scanned, grouped by what needs doing and nested by folder.",
+        trailing=_toolbar(portal),
+        content=body,
+    )
+
+
+def _toolbar(portal):
+    p = palette()
+    read_only = portal.state["sync_stage"] != "reviewing"
+
+    def on_filter(e):
+        portal.state["scan_filter"] = e.control.value
+        portal.refresh()
+
+    def on_status(e):
+        portal.state["scan_status_filter"] = e.control.value
+        portal.refresh()
+
+    def select_all(_):
+        # Removals are excluded on purpose - they are deletions, so they only
+        # ever get ticked one at a time.
+        portal.state["scan_selected"] = {
+            c["key"] for c in portal.state["scan_changes"]
+            if _group_of(c) in ("add", "update")
+        }
+        portal.refresh()
+
+    def clear(_):
+        portal.state["scan_selected"] = set()
+        portal.refresh()
+
+    def set_folders(is_open):
+        def handler(_):
+            portal.state["scan_folders_open"] = {i: is_open for i in _folder_ids(portal)}
+            portal.refresh()
+        return handler
+
+    search = ft.TextField(
+        value=portal.state["scan_filter"],
+        hint_text="Filter by path",
+        hint_style=ft.TextStyle(size=12, color=p.text_faint),
+        prefix_icon=ft.Icons.SEARCH_ROUNDED,
+        text_size=12,
+        height=40,
+        width=220,
+        dense=True,
+        content_padding=ft.padding.symmetric(horizontal=Space.MD, vertical=0),
+        filled=True,
+        fill_color=p.surface_alt,
+        border_color=p.border,
+        focused_border_color=p.primary,
+        border_radius=Radius.MD,
+        on_submit=on_filter,
+        on_change=on_filter,
+    )
+
+    status = ft.Container(
+        content=ft.Dropdown(
+            value=portal.state["scan_status_filter"],
+            options=[ft.dropdown.Option(key, text) for key, text in STATUS_FILTERS],
+            width=150,
+            text_size=12,
+            dense=True,
+            content_padding=ft.padding.symmetric(horizontal=Space.MD, vertical=0),
+            filled=True,
+            fill_color=p.surface_alt,
+            border_color=p.border,
+            focused_border_color=p.primary,
+            border_radius=Radius.MD,
+            on_change=on_status,
+        ),
+        height=40,
+    )
+
+    controls = [
+        search,
+        status,
+        w.icon_button(ft.Icons.UNFOLD_MORE_ROUNDED, "Expand all folders", set_folders(True)),
+        w.icon_button(ft.Icons.UNFOLD_LESS_ROUNDED, "Collapse all folders", set_folders(False)),
+    ]
+    if not read_only:
+        controls += [
+            w.ghost_button("Select all", on_click=select_all, dense=True),
+            w.ghost_button("Clear", on_click=clear, dense=True),
+        ]
+    return ft.Row(controls, spacing=Space.SM)
+
+
+def _group(portal, refs, group_key, heading, description, tone_name, tickable, allow_all, rows):
+    p = palette()
+    fg, bg = tone(tone_name)
+    is_open = portal.state["scan_groups_open"].get(group_key, True)
+    read_only = portal.state["sync_stage"] != "reviewing"
+    selected = portal.state["scan_selected"]
+    ticked = sum(1 for r in rows if r["key"] in selected)
+
+    def toggle_open(_):
+        portal.state["scan_groups_open"][group_key] = not is_open
+        portal.refresh()
+
+    def toggle_all(e):
+        keys = {r["key"] for r in rows}
+        if e.control.value:
+            selected.update(keys)
+        else:
+            selected.difference_update(keys)
+        portal.refresh()
+
+    caret = ft.Icon(
+        ft.Icons.EXPAND_MORE_ROUNDED if is_open else ft.Icons.CHEVRON_RIGHT_ROUNDED,
+        size=18,
+        color=p.text_muted,
+    )
+    counter = ft.Text(f"{ticked} ticked" if tickable else "", size=11, color=fg)
+    refs[f"count_{group_key}"] = counter
+
+    title = ft.Row(
+        [
+            caret,
+            ft.Text(heading, size=13, weight=ft.FontWeight.W_700, color=p.text),
+            w.pill(str(len(rows)), tone_name),
+            ft.Text(description, size=11, color=p.text_muted, expand=True,
+                    overflow=ft.TextOverflow.ELLIPSIS),
+            counter,
+        ],
+        spacing=Space.MD,
+        vertical_alignment=ft.CrossAxisAlignment.CENTER,
+    )
+
+    if tickable and allow_all and not read_only:
+        header_content = w.check_row(
+            None if 0 < ticked < len(rows) else ticked == len(rows),
+            ft.Container(content=title, on_click=toggle_open, expand=True),
+            on_change=toggle_all,
+            tristate=True,
+        )
+        refs[f"group_{group_key}"] = header_content.data
+    else:
+        header_content = w.check_spacer(ft.Container(content=title, on_click=toggle_open, expand=True))
+
+    header = ft.Container(
+        content=header_content,
+        padding=ft.padding.symmetric(horizontal=Space.MD, vertical=Space.SM),
+        bgcolor=bg,
+        border_radius=Radius.SM,
+    )
+
+    if not is_open:
+        return header
+
+    visible = _visible(portal, rows)
+    body = []
+
+    if group_key == "remove" and rows:
+        body.append(_remove_caution(len(rows)))
+
+    if not visible:
+        body.append(
+            ft.Container(
+                content=ft.Text("No file in this group matches the filter.",
+                                size=12, color=p.text_faint),
+                padding=ft.padding.symmetric(horizontal=Space.MD, vertical=Space.MD),
+            )
+        )
+    else:
+        shown = visible
+        if group_key == "unchanged" and not portal.state["scan_show_all_unchanged"]:
+            shown = visible[:UNCHANGED_PREVIEW]
+
+        row_tickable = tickable and not read_only
+        # Folder-level ticking follows the same rule as select-all, so the
+        # remove group keeps its one-at-a-time guard.
+        body += _tree_rows(portal, refs, group_key, _tree(shown),
+                           row_tickable, row_tickable and allow_all)
+
+        if len(shown) < len(visible):
+            body.append(_show_all(portal, len(visible) - len(shown)))
+
+    return ft.Column([header, ft.Column(body, spacing=0)], spacing=Space.SM)
+
+
+# --- folder tree ------------------------------------------------------------
+
+INDENT = 22
+
+
+def _tree(changes):
+    """Nest changes under their folders, keyed by path segment."""
+    root = {"folders": {}, "files": []}
+    for change in changes:
+        folder, _, _name = change["key"].rpartition("\\")
+        node = root
+        for segment in folder.split("\\") if folder else []:
+            node = node["folders"].setdefault(segment, {"folders": {}, "files": []})
+        node["files"].append(change)
+    return root
+
+
+def _collapse(name, node):
+    """Squash a folder holding one subfolder and no files into one row.
+
+    Keeps deep paths like Python\\Python Notes\\Async on a single line
+    instead of spending three levels of indent on them.
+    """
+    while not node["files"] and len(node["folders"]) == 1:
+        child_name, child = next(iter(node["folders"].items()))
+        name = f"{name}\\{child_name}"
+        node = child
+    return name, node
+
+
+def _node_keys(node):
+    keys = {change["key"] for change in node["files"]}
+    for child in node["folders"].values():
+        keys |= _node_keys(child)
+    return keys
+
+
+def _folder_open(portal, group_key, path):
+    """Folders start open where you are expected to act, closed in the
+    long tail. An explicit click always wins."""
+    default = group_key not in ("blocked", "unchanged")
+    return portal.state["scan_folders_open"].get(f"{group_key}|{path}", default)
+
+
+def _folder_ids(portal):
+    """Every folder id in every group, including the prefixes that chain
+    collapsing hides - setting one of those is harmless."""
+    ids = set()
+    for change in portal.state["scan_changes"]:
+        group_key = _group_of(change)
+        folder = change["key"].rpartition("\\")[0]
+        segments = folder.split("\\") if folder else []
+        for index in range(1, len(segments) + 1):
+            ids.add(f"{group_key}|" + "\\".join(segments[:index]))
+    return ids
+
+
+def _tree_rows(portal, refs, group_key, node, row_tickable, folder_tickable,
+               depth=0, parent_path=""):
+    rows = []
+    for name in sorted(node["folders"], key=str.lower):
+        label, child = _collapse(name, node["folders"][name])
+        path = f"{parent_path}\\{label}" if parent_path else label
+        is_open = _folder_open(portal, group_key, path)
+        rows.append(_folder_row(portal, refs, group_key, path, label, child,
+                                folder_tickable, depth, is_open))
+        if is_open:
+            rows += _tree_rows(portal, refs, group_key, child, row_tickable,
+                               folder_tickable, depth + 1, path)
+    for change in sorted(node["files"], key=lambda c: c["key"].lower()):
+        rows.append(_change_row(portal, refs, group_key, change, row_tickable, depth))
+    return rows
+
+
+def _folder_row(portal, refs, group_key, path, label, node, tickable, depth, is_open):
+    p = palette()
+    keys = _node_keys(node)
+    ticked = len(keys & portal.state["scan_selected"])
+
+    def toggle_tick(e):
+        if e.control.value:
+            portal.state["scan_selected"].update(keys)
+        else:
+            portal.state["scan_selected"].difference_update(keys)
+        portal.refresh()
+
+    def toggle_open(_):
+        folders = portal.state["scan_folders_open"]
+        folders[f"{group_key}|{path}"] = not is_open
+        portal.refresh()
+
+    content = ft.Container(
+        content=ft.Row(
+            [
+                ft.Icon(
+                    ft.Icons.EXPAND_MORE_ROUNDED if is_open else ft.Icons.CHEVRON_RIGHT_ROUNDED,
+                    size=16,
+                    color=p.text_muted,
+                ),
+                ft.Icon(
+                    ft.Icons.FOLDER_OPEN_ROUNDED if is_open else ft.Icons.FOLDER_ROUNDED,
+                    size=16,
+                    color=p.text_faint,
+                ),
+                ft.Text(label, size=12, weight=ft.FontWeight.W_600, color=p.text_muted,
+                        overflow=ft.TextOverflow.ELLIPSIS, expand=True),
+                ft.Text(f"{ticked}/{len(keys)}" if tickable else str(len(keys)),
+                        size=11, color=p.text_faint),
+            ],
+            spacing=Space.SM,
+            vertical_alignment=ft.CrossAxisAlignment.CENTER,
+        ),
+        on_click=toggle_open,
+        expand=True,
+    )
+
+    if tickable:
+        row = w.check_row(
+            None if 0 < ticked < len(keys) else ticked == len(keys),
+            content,
+            on_change=toggle_tick,
+            tristate=True,
+        )
+        refs.setdefault("nodes", []).append((group_key, row.data, keys))
+    else:
+        row = w.check_spacer(content)
+
+    return ft.Container(
+        content=row,
+        padding=ft.padding.only(left=Space.MD + depth * INDENT, right=Space.MD,
+                                top=Space.XS, bottom=Space.XS),
+    )
+
+
+def _remove_caution(count):
+    p = palette()
+    fg, bg = tone("warning")
+    embedded = int(data.SCAN_STATS["embedded"])
+    heavy = embedded and count / embedded > REMOVE_WARN_RATIO
+
+    message = ("These documents are gone from Drive. Ticking one deletes its embedding, "
+               "which cannot be undone from here.")
+    if heavy:
+        message = (f"{count} of {embedded} documents would be deleted. That is a large share of "
+                   "the collection - check the Drive folder id in Settings before ticking any.")
+
+    return ft.Container(
+        content=ft.Row(
+            [
+                ft.Icon(ft.Icons.WARNING_AMBER_ROUNDED, size=18, color=fg),
+                ft.Text(message, size=11, color=p.text_muted, expand=True),
+            ],
+            spacing=Space.MD,
+            vertical_alignment=ft.CrossAxisAlignment.CENTER,
+        ),
+        padding=ft.padding.symmetric(horizontal=Space.MD, vertical=Space.SM),
+        margin=ft.margin.only(bottom=Space.XS),
+        bgcolor=bg,
+        border=ft.border.all(1, fg) if heavy else None,
+        border_radius=Radius.SM,
+    )
+
+
+def _show_all(portal, remaining):
+    def handler(_):
+        portal.state["scan_show_all_unchanged"] = True
+        portal.refresh()
+
+    return ft.Container(
+        content=w.ghost_button(f"Show {remaining} more", on_click=handler, dense=True),
+        padding=ft.padding.only(left=w.CHECK_WIDTH + Space.MD, top=Space.SM),
+    )
+
+
+def _change_row(portal, refs, group_key, change, tickable, depth=0):
+    p = palette()
+    label, tone_name, _ = STATUS_META[change["status"]]
+    name = change["key"].rpartition("\\")[2]
+    selected = change["key"] in portal.state["scan_selected"]
+
+    def on_toggle(e):
+        if e.control.value:
+            portal.state["scan_selected"].add(change["key"])
+        else:
+            portal.state["scan_selected"].discard(change["key"])
+        _retick(portal, refs, group_key)
+        _relabel_run_button(portal, refs)
+
+    detail = (
+        BLOCKED_REASONS[change["status"]]
+        if group_key == "blocked"
+        else _timestamps(change)
+    )
+
+    content = ft.Row(
+        [
+            w.file_icon(change["kind"], size=28),
+            ft.Text(name, size=13, weight=ft.FontWeight.W_600, color=p.text,
+                    overflow=ft.TextOverflow.ELLIPSIS, expand=True),
+            ft.Container(
+                content=ft.Text(detail, size=11, color=p.text_muted,
+                                overflow=ft.TextOverflow.ELLIPSIS),
+                width=250,
+            ),
+            ft.Container(
+                content=w.pill("reconvert", "neutral") if change["needs_conversion"] else None,
+                width=88,
+            ),
+            ft.Container(content=w.pill(label, tone_name), width=120),
+        ],
+        spacing=Space.MD,
+        vertical_alignment=ft.CrossAxisAlignment.CENTER,
+    )
+
+    row = (
+        w.check_row(selected, content, on_change=on_toggle)
+        if tickable
+        else w.check_spacer(content)
+    )
+
+    def on_hover(e):
+        e.control.bgcolor = p.surface_alt if e.data == "true" else "transparent"
+        e.control.update()
+
+    return ft.Container(
+        content=row,
+        padding=ft.padding.only(left=Space.MD + depth * INDENT, right=Space.MD,
+                                top=Space.SM, bottom=Space.SM),
+        border_radius=Radius.SM,
+        opacity=0.55 if portal.state["sync_stage"] == "updating" else 1,
+        on_hover=on_hover,
+    )
+
+
+def _timestamps(change):
+    drive = change["drive_modified"]
+    stored = change["stored_modified"]
+    if drive and stored:
+        return f"Drive {drive}  -  stored {stored}"
+    if drive:
+        return f"Drive {drive}  -  not embedded yet"
+    if stored:
+        return f"stored {stored}  -  gone from Drive"
+    return "no timestamp"
+
+
+def _retick(portal, refs, group_key):
+    """Recompute one group's folder and header checkboxes in place.
+
+    Ticking a row must never call portal.refresh() - that rebuilds every
+    control on the screen. Only the boxes above the toggled row change.
+    """
+    selected = portal.state["scan_selected"]
+
+    for node_group, box, keys in refs.get("nodes", []):
+        if node_group != group_key:
+            continue
+        ticked = len(keys & selected)
+        box.value = None if 0 < ticked < len(keys) else ticked == len(keys)
+        box.update()
+
+    rows = _in_group(portal, group_key)
+    ticked = sum(1 for row in rows if row["key"] in selected)
+
+    counter = refs.get(f"count_{group_key}")
+    if counter is not None:
+        counter.value = f"{ticked} ticked"
+        counter.update()
+
+    box = refs.get(f"group_{group_key}")
+    if box is not None:
+        box.value = None if 0 < ticked < len(rows) else ticked == len(rows)
+        box.update()
+
+
+def _relabel_run_button(portal, refs):
+    button = refs.get("run")
+    if button is None:
+        return
+    selected = len(portal.state["scan_selected"])
+    button.text = _run_label(selected)
+    button.disabled = selected == 0
+    button.update()
+
+
 # --- sync side panel --------------------------------------------------------
 
-def _summary(stage):
-    p = palette()
+def _summary(portal):
+    stage = portal.state["sync_stage"]
 
     if stage == "idle":
         return w.section(
             "Last run summary",
-            "Result of the previous sync.",
+            "Result of the previous run.",
             content=w.empty_state(
                 ft.Icons.HISTORY_ROUNDED,
                 "No run in this session",
-                "Start a sync to see how many documents were added, updated or removed.",
+                "Scan to see which files are new, changed or gone from Drive.",
                 height=220,
             ),
         )
 
-    tiles = []
-    for name, value, tone_name in data.SYNC_SUMMARY:
-        fg, bg = tone(tone_name)
-        tiles.append(
-            ft.Container(
-                content=ft.Column(
-                    [
-                        ft.Text("-" if stage == "running" else value, size=22,
-                                weight=ft.FontWeight.W_700, color=fg),
-                        ft.Text(name, size=11, weight=ft.FontWeight.W_600, color=p.text_muted),
-                    ],
-                    spacing=0,
-                ),
-                padding=Space.LG,
-                bgcolor=bg,
-                border_radius=Radius.MD,
-                expand=True,
-            )
+    if stage == "scanning":
+        return w.section(
+            "Scanning",
+            "Nothing is written while a scan runs.",
+            content=ft.Column(
+                [
+                    w.kv_row("Input", "resources\\files"),
+                    w.kv_row("Collection", settingService.get(EMBEDDING_COLLECTION), is_mono=True),
+                    w.divider(bottom=Space.MD),
+                    w.kv_row("Reads", "source mtimes, Drive listing, collection metadata"),
+                    w.kv_row("Writes", "nothing"),
+                ],
+                spacing=Space.MD,
+            ),
         )
 
+    selected = len(portal.state["scan_selected"])
     return w.section(
-        "Last run summary",
-        "Counts reported by TextEmbedderService.sync_collection().",
+        "This run",
+        "Only the ticked files are touched.",
         content=ft.Column(
             [
-                ft.Row(tiles[:2], spacing=Space.MD),
-                ft.Row(tiles[2:], spacing=Space.MD),
-                w.divider(bottom=Space.MD),
-                w.kv_row("Started", "10:24:01"),
-                w.kv_row("Duration", "24s" if stage == "done" else "running..."),
+                w.kv_row("Selected", str(selected)),
                 w.kv_row("Collection", settingService.get(EMBEDDING_COLLECTION), is_mono=True),
+                w.kv_row("Embedding model", settingService.get(EMBEDDING_MODEL), is_mono=True),
+                w.divider(bottom=Space.MD),
+                w.kv_row("Cancel", "Stops after the current file"),
             ],
             spacing=Space.MD,
         ),
     )
+
+
+# --- runs (scripted for now) ------------------------------------------------
+
+def _log(portal, level, message):
+    portal.state["sync_log"].append((time.strftime("%H:%M:%S"), level, message))
+
+
+def _cancel(portal):
+    portal.state["sync_cancel"] = True
+    portal.notify("Stopping after the current file.", "warning")
+
+
+def _play(portal, script, stages):
+    """Step through a scripted run, refreshing at each line.
+
+    Flet already dispatches non-async handlers on a worker thread, so the
+    sleeps here do not block the UI. Phase 3 replaces this with the real
+    services behind page.run_thread.
+    """
+    for index, (level, message) in enumerate(script):
+        if portal.state["sync_cancel"]:
+            _log(portal, "WARN", "Cancelled")
+            portal.refresh()
+            return False
+        time.sleep(0.4)
+        _log(portal, level, message)
+        fraction = (index + 1) / len(script)
+        step = min(int(fraction * len(stages)) + 1, len(stages))
+        portal.state["sync_progress"] = (f"Step {step} of {len(stages)}", fraction)
+        portal.refresh()
+    return True
+
+
+def _scan(portal):
+    portal.state.update({
+        "sync_stage": "scanning",
+        "sync_log": [],
+        "sync_error": None,
+        "sync_result": None,
+        "sync_cancel": False,
+        "scan_changes": [],
+        "scan_selected": set(),
+        "scan_stats": None,
+        "scan_filter": "",
+        "scan_status_filter": "all",
+        "scan_show_all_unchanged": False,
+        "sync_progress": ("Step 1 of 3", 0.0),
+    })
+    portal.refresh()
+
+    if not _play(portal, SCAN_SCRIPT, SCAN_STAGES):
+        portal.state["sync_stage"] = "idle"
+        portal.state["sync_progress"] = None
+        portal.refresh()
+        return
+
+    changes = [dict(change) for change in data.SCAN_CHANGES]
+    portal.state["scan_changes"] = changes
+    # Adds and updates start ticked; removals never do - they are deletions.
+    portal.state["scan_selected"] = {
+        c["key"] for c in changes if _group_of(c) in ("add", "update")
+    }
+    portal.state["scan_stats"] = data.SCAN_STATS
+    portal.state["sync_progress"] = None
+    portal.state["sync_stage"] = "reviewing"
+    portal.refresh()
+
+
+def _update(portal):
+    selected = set(portal.state["scan_selected"])
+    if not selected:
+        return
+
+    portal.state["sync_stage"] = "updating"
+    portal.state["sync_cancel"] = False
+    portal.state["sync_progress"] = ("Step 1 of 3", 0.0)
+    _log(portal, "INFO", f"Updating {len(selected)} selected files")
+    portal.refresh()
+
+    completed = _play(portal, APPLY_SCRIPT, APPLY_STAGES)
+
+    picked = [c for c in portal.state["scan_changes"] if c["key"] in selected]
+    portal.state["sync_result"] = {
+        "converted": sum(1 for c in picked if c["needs_conversion"]),
+        "added": sum(1 for c in picked if c["status"] == "added"),
+        "updated": sum(1 for c in picked if c["status"] in ("updated", "stale_local")),
+        "removed": sum(1 for c in picked if c["status"] == "removed"),
+        "skipped": len(portal.state["scan_changes"]) - len(picked),
+        "failed": 0,
+    }
+    portal.state["sync_progress"] = None
+    portal.state["sync_stage"] = "done" if completed else "reviewing"
+    portal.refresh()
+    if completed:
+        portal.notify(f"Updated {len(picked)} files.", "success")
 
 
 # --- reset side panel -------------------------------------------------------

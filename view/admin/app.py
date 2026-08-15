@@ -28,9 +28,33 @@ class AdminPortal:
             "collections_filter": "",
             "page_size": 10,
             "sync_mode": "sync",     # sync | reset
+            # idle -> scanning -> reviewing -> updating -> done
             "sync_stage": "idle",
             "reset_confirm": "",
             "settings_edits": {},    # key -> unsaved value
+
+            # Sync review: the scan result and what is ticked for updating.
+            "scan_changes": [],
+            "scan_selected": set(),
+            "scan_filter": "",
+            "scan_status_filter": "all",
+            "scan_groups_open": {
+                "add": True,
+                "update": True,
+                "remove": True,
+                "blocked": False,
+                "unchanged": False,
+            },
+            # "<group>|<folder path>" -> bool. Absent means the group default,
+            # so only folders you actually clicked are tracked.
+            "scan_folders_open": {},
+            "scan_show_all_unchanged": False,
+            "scan_stats": None,
+            "sync_log": [],          # (hh:mm:ss, LEVEL, message)
+            "sync_progress": None,   # (caption, 0..1 or None)
+            "sync_result": None,     # counts from the last apply
+            "sync_error": None,
+            "sync_cancel": False,
         }
         self._body = ft.Container(expand=True)
 
