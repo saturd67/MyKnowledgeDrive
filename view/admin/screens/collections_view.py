@@ -24,11 +24,11 @@ class CollectionsView(BaseView):
 
         return ft.Column(
             [
-                w.page_header(
+                w.PageHeader(
                     "Collections",
                     f"{len(data.DOCUMENTS)} documents embedded in {settingService.get(EMBEDDING_COLLECTION)}.",
                     actions=[
-                        w.ghost_button(
+                        w.GhostButton(
                             "Refresh",
                             icon=ft.Icons.REFRESH_ROUNDED,
                             on_click=lambda _: self.not_implemented("Refresh collections"),
@@ -38,16 +38,16 @@ class CollectionsView(BaseView):
                 ft.Container(height=Space.XL),
                 ft.Row(
                     [
-                        w.stat_card(ft.Icons.STORAGE_ROUNDED, "Total documents", str(len(data.DOCUMENTS)), None,
+                        w.StatCard(ft.Icons.STORAGE_ROUNDED, "Total documents", str(len(data.DOCUMENTS)), None,
                                     "primary"),
-                        w.stat_card(ft.Icons.FILTER_ALT_ROUNDED, "Matching filter", str(len(rows)), None, "info"),
-                        w.stat_card(ft.Icons.LAYERS_ROUNDED, "Pages", str(total_pages), f"{page_size} per page",
+                        w.StatCard(ft.Icons.FILTER_ALT_ROUNDED, "Matching filter", str(len(rows)), None, "info"),
+                        w.StatCard(ft.Icons.LAYERS_ROUNDED, "Pages", str(total_pages), f"{page_size} per page",
                                     "warning"),
                     ],
                     spacing=Space.LG,
                 ),
                 ft.Container(height=Space.LG),
-                w.section(
+                w.Section(
                     "Embedded documents",
                     "Chroma document id and its label metadata.",
                     trailing=self._toolbar(),
@@ -124,7 +124,7 @@ class CollectionsView(BaseView):
 
     def _table(self, visible, current, page_size):
         if not visible:
-            return w.empty_state(
+            return w.EmptyState(
                 ft.Icons.SEARCH_OFF_ROUNDED,
                 "No documents match that filter",
                 "Try a shorter path fragment, or clear the filter to list everything.",
@@ -133,10 +133,10 @@ class CollectionsView(BaseView):
         header = ft.Container(
             content=ft.Row(
                 [
-                    ft.Container(content=w.label("#"), width=40),
-                    ft.Container(content=w.label("Document id"), width=290),
-                    ft.Container(content=w.label("Label"), expand=True),
-                    ft.Container(content=w.label("Type"), width=80),
+                    ft.Container(content=w.Label("#"), width=40),
+                    ft.Container(content=w.Label("Document id"), width=290),
+                    ft.Container(content=w.Label("Label"), expand=True),
+                    ft.Container(content=w.Label("Type"), width=80),
                     ft.Container(width=88),
                 ],
                 spacing=Space.MD,
@@ -164,7 +164,7 @@ class CollectionsView(BaseView):
             content=ft.Row(
                 [
                     ft.Container(content=ft.Text(str(number), size=12, color=p.text_faint), width=40),
-                    ft.Container(content=w.mono(doc_id, size=11), width=290),
+                    ft.Container(content=w.Mono(doc_id, size=11), width=290),
                     ft.Container(
                         content=ft.Column(
                             [
@@ -177,12 +177,12 @@ class CollectionsView(BaseView):
                         ),
                         expand=True,
                     ),
-                    ft.Container(content=w.pill(kind, self._kind_tone(kind)), width=80),
+                    ft.Container(content=w.Pill(kind, self._kind_tone(kind)), width=80),
                     ft.Row(
                         [
-                            w.icon_button(ft.Icons.CONTENT_COPY_ROUNDED, "Copy document id",
+                            w.IconButton(ft.Icons.CONTENT_COPY_ROUNDED, "Copy document id",
                                           lambda _: self.not_implemented("Copy document id")),
-                            w.icon_button(ft.Icons.OPEN_IN_NEW_ROUNDED, "Open in Google Drive",
+                            w.IconButton(ft.Icons.OPEN_IN_NEW_ROUNDED, "Open in Google Drive",
                                           lambda _: self.not_implemented("Open in Google Drive")),
                         ],
                         spacing=0,
@@ -253,9 +253,9 @@ class CollectionsView(BaseView):
                                     size=12, color=p.text_muted),
                     expand=True,
                 ),
-                w.icon_button(ft.Icons.CHEVRON_LEFT_ROUNDED, "Previous page", go(-1)),
+                w.IconButton(ft.Icons.CHEVRON_LEFT_ROUNDED, "Previous page", go(-1)),
                 ft.Row(numbers, spacing=Space.XS),
-                w.icon_button(ft.Icons.CHEVRON_RIGHT_ROUNDED, "Next page", go(1)),
+                w.IconButton(ft.Icons.CHEVRON_RIGHT_ROUNDED, "Next page", go(1)),
             ],
             vertical_alignment=ft.CrossAxisAlignment.CENTER,
             spacing=Space.SM,

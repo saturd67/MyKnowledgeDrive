@@ -125,11 +125,11 @@ class SearchView(BaseView):
 
         if self.state["query"]:
             controls.append(
-                w.icon_button(ft.Icons.CLOSE_ROUNDED, "Clear", lambda _: self.portal.clear())
+                w.IconButton(ft.Icons.CLOSE_ROUNDED, "Clear", lambda _: self.portal.clear())
             )
 
         controls.append(
-            w.primary_button(
+            w.PrimaryButton(
                 "Search",
                 icon=ft.Icons.ARROW_FORWARD_ROUNDED,
                 on_click=lambda _: self.portal.search(field.value),
@@ -156,10 +156,10 @@ class SearchView(BaseView):
             count = ft.ProgressRing(width=16, height=16, stroke_width=2, color=p.primary)
         elif mode == "empty":
             caption = f'No matches for "{query}"'
-            count = w.pill("0 results", "warning")
+            count = w.Pill("0 results", "warning")
         else:
             caption = f'Top matches for "{query}"'
-            count = w.pill(f"{len(data.SEARCH_RESULTS)} results", "success")
+            count = w.Pill(f"{len(data.SEARCH_RESULTS)} results", "success")
 
         return ft.Row(
             [
@@ -182,12 +182,12 @@ class SearchView(BaseView):
             return ft.Column([self._skeleton() for _ in range(4)], spacing=Space.MD)
 
         if mode == "empty":
-            return w.card(
-                w.empty_state(
+            return w.Card(
+                w.EmptyState(
                     ft.Icons.SEARCH_OFF_ROUNDED,
                     "Nothing close enough",
                     "Try different wording, or run a sync in the admin portal if the note is new.",
-                    action=w.ghost_button("Start over", icon=ft.Icons.REFRESH_ROUNDED,
+                    action=w.GhostButton("Start over", icon=ft.Icons.REFRESH_ROUNDED,
                                           on_click=lambda _: self.portal.clear()),
                     height=320,
                 )
@@ -209,7 +209,7 @@ class SearchView(BaseView):
             self.state["selected"] = index
             self.refresh()
 
-        return w.hoverable(
+        return w.Hoverable(
             ft.Row(
                 [
                     ft.Container(
@@ -217,7 +217,7 @@ class SearchView(BaseView):
                                         color=p.primary if selected else p.text_faint),
                         width=20,
                     ),
-                    w.file_icon(result["kind"], size=40),
+                    w.FileIcon(result["kind"], size=40),
                     ft.Column(
                         [
                             ft.Text(name, size=14, weight=ft.FontWeight.W_600, color=p.text,
@@ -270,7 +270,7 @@ class SearchView(BaseView):
         relevance = ft.Container(
             content=ft.Column(
                 [
-                    w.label("Relevance"),
+                    w.Label("Relevance"),
                     ft.Row(
                         [
                             ft.Container(
@@ -296,8 +296,8 @@ class SearchView(BaseView):
                 [
                     ft.Row(
                         [
-                            w.label("Drive id"),
-                            w.mono(result["id"], size=11, color=p.text, max_lines=1,
+                            w.Label("Drive id"),
+                            w.Mono(result["id"], size=11, color=p.text, max_lines=1,
                                    overflow=ft.TextOverflow.ELLIPSIS, expand=True),
                         ],
                         spacing=Space.SM,
@@ -313,9 +313,9 @@ class SearchView(BaseView):
 
         actions = ft.Row(
             [
-                w.icon_button(ft.Icons.LINK_ROUNDED, "Copy Drive link",
+                w.IconButton(ft.Icons.LINK_ROUNDED, "Copy Drive link",
                               lambda _: self.not_implemented("Copy Drive link")),
-                w.primary_button(
+                w.PrimaryButton(
                     "Open in Google Drive",
                     icon=ft.Icons.OPEN_IN_NEW_ROUNDED,
                     dense=True,
@@ -325,7 +325,7 @@ class SearchView(BaseView):
             spacing=Space.XS,
         )
 
-        return w.card(
+        return w.Card(
             ft.Row(
                 [
                     relevance,
@@ -347,7 +347,7 @@ class SearchView(BaseView):
         def bar(width, height=12):
             return ft.Container(width=width, height=height, bgcolor=p.surface_high, border_radius=Radius.SM)
 
-        return w.card(
+        return w.Card(
             ft.Row(
                 [
                     ft.Container(width=40, height=40, bgcolor=p.surface_high, border_radius=Radius.MD),

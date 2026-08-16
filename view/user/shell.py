@@ -63,7 +63,7 @@ class UserPortal:
     # --- helpers available to the screen -------------------------------------
 
     def notify(self, message, tone_name="neutral"):
-        self.page.open(w.snack_bar(self.page, message, tone_name))
+        self.page.open(w.SnackBar(self.page, message, tone_name))
 
     def not_implemented(self, feature):
         # TODO: wire to TextEmbedderService.query(), then open
@@ -98,8 +98,8 @@ class UserPortal:
         header = ft.Container(
             content=ft.Row(
                 [
-                    ft.Container(content=w.label("Search history"), expand=True),
-                    w.icon_button(
+                    ft.Container(content=w.Label("Search history"), expand=True),
+                    w.IconButton(
                         ft.Icons.DELETE_SWEEP_ROUNDED,
                         "Clear history",
                         lambda _: self.not_implemented("Clear search history"),
@@ -119,7 +119,7 @@ class UserPortal:
             )
         else:
             history = ft.Container(
-                content=w.empty_state(
+                content=w.EmptyState(
                     ft.Icons.HISTORY_ROUNDED,
                     "No searches yet",
                     "Queries you run will be listed here.",
@@ -130,7 +130,7 @@ class UserPortal:
 
         return ft.Column(
             [
-                ft.Container(content=w.brand(portal="User Portal"), padding=ft.padding.all(Space.LG)),
+                ft.Container(content=w.Brand(portal="User Portal"), padding=ft.padding.all(Space.LG)),
                 ft.Container(height=1, bgcolor=p.border_soft),
                 header,
                 history,
@@ -143,7 +143,7 @@ class UserPortal:
         p = palette()
         active = self.state["mode"] != "hero" and self.state["query"] == query
 
-        return w.hoverable(
+        return w.Hoverable(
             ft.Row(
                 [
                     ft.Column(

@@ -98,7 +98,7 @@ class AdminPortal:
     # --- helpers available to the screens ------------------------------------
 
     def notify(self, message, tone_name="neutral"):
-        self.page.open(w.snack_bar(self.page, message, tone_name))
+        self.page.open(w.SnackBar(self.page, message, tone_name))
 
     def not_implemented(self, feature):
         # TODO: wire to the matching FileConverterService/TextEmbedderService call
@@ -132,7 +132,7 @@ class AdminPortal:
         return ft.Container(
             content=ft.Column(
                 [
-                    ft.Container(content=w.brand(portal="Admin Portal"), padding=ft.padding.all(Space.LG)),
+                    ft.Container(content=w.Brand(portal="Admin Portal"), padding=ft.padding.all(Space.LG)),
                     ft.Container(height=1, bgcolor=p.border_soft),
                     ft.Container(
                         content=ft.Column(items, spacing=Space.XS),
