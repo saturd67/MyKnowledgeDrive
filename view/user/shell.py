@@ -10,7 +10,7 @@ from view import portal_rail
 from view import theme
 from view import widgets as w
 from view.theme import Space, palette
-from view.user.screens import search_view
+from view.user.screens.search_view import SearchView
 
 
 class UserPortal:
@@ -38,7 +38,7 @@ class UserPortal:
     def render(self):
         theme.apply(self.page)
         self.page.controls.clear()
-        self._body = ft.Container(content=search_view.build(self), expand=True)
+        self._body = ft.Container(content=SearchView(self).build(), expand=True)
         self._history = self._sidebar()
         self.page.add(
             ft.Row(
@@ -55,7 +55,7 @@ class UserPortal:
         self.page.update()
 
     def refresh(self):
-        self._body.content = search_view.build(self)
+        self._body.content = SearchView(self).build()
         self._body.update()
         self._history.content = self._sidebar_content()
         self._history.update()

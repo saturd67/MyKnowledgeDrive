@@ -8,13 +8,16 @@ import flet as ft
 from view import portal_rail
 from view import theme
 from view import widgets as w
-from view.admin.screens import collections_view, settings_view, sync_view
+from view.admin.screens.collections_view import CollectionsView
+from view.admin.screens.settings_view import SettingsView
+from view.admin.screens.sync_view import SyncView
 from view.theme import Radius, Space, palette
 
+# text, icon, selected icon, BaseView subclass
 NAV_ITEMS = [
-    ("Collections", ft.Icons.TABLE_ROWS_OUTLINED, ft.Icons.TABLE_ROWS_ROUNDED, collections_view),
-    ("Sync & Reset", ft.Icons.SYNC_OUTLINED, ft.Icons.SYNC_ROUNDED, sync_view),
-    ("Settings", ft.Icons.TUNE_OUTLINED, ft.Icons.TUNE_ROUNDED, settings_view),
+    ("Collections", ft.Icons.TABLE_ROWS_OUTLINED, ft.Icons.TABLE_ROWS_ROUNDED, CollectionsView),
+    ("Sync & Reset", ft.Icons.SYNC_OUTLINED, ft.Icons.SYNC_ROUNDED, SyncView),
+    ("Settings", ft.Icons.TUNE_OUTLINED, ft.Icons.TUNE_ROUNDED, SettingsView),
 ]
 
 
@@ -104,7 +107,9 @@ class AdminPortal:
     # --- layout --------------------------------------------------------------
 
     def _view(self):
-        return NAV_ITEMS[self.index][3].build(self)
+        """A screen is built fresh each time - the instance lives for one build."""
+        view_class = NAV_ITEMS[self.index][3]
+        return view_class(self).build()
 
     def _content(self):
         return ft.Container(

@@ -1,1 +1,1 @@
-"""Admin portal screens - each module builds one page of the shell."""
+"""Admin portal screens - each module holds one BaseView subclass."""
