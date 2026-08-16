@@ -66,7 +66,8 @@ class UserPortal:
         self.page.open(w.snack_bar(self.page, message, tone_name))
 
     def not_implemented(self, feature):
-        # TODO: wire to TextEmbedderService.query() / webbrowser in user_portal.py
+        # TODO: wire to TextEmbedderService.query(), then open
+        # https://drive.google.com/file/d/<id> for the picked result
         self.notify(f"{feature} is not wired up yet - this is the UI shell.", "info")
 
     def search(self, query):

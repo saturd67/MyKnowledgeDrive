@@ -422,7 +422,7 @@ def _console(portal, mode):
     )
     return w.section(
         "Run log",
-        "Mirrors what the CLI prints to stdout.",
+        "Mirrors what the services log while a run is in progress.",
         trailing=w.icon_button(ft.Icons.CONTENT_COPY_ROUNDED, "Copy log"),
         content=content,
     )
@@ -1297,5 +1297,6 @@ def _open_dialog(portal):
 
 def _confirmed(portal, dialog):
     portal.page.close(dialog)
-    # TODO: wire to Action.reset() in admin_portal.py
+    # TODO: wire to FileConverterService.start_convert_files() then
+    # TextEmbedderService.reset_collection() + embed_collection()
     portal.not_implemented("Reset collections")

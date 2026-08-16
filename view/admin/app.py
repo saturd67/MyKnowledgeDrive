@@ -98,7 +98,7 @@ class AdminPortal:
         self.page.open(w.snack_bar(self.page, message, tone_name))
 
     def not_implemented(self, feature):
-        # TODO: wire to the matching Action method in admin_portal.py
+        # TODO: wire to the matching FileConverterService/TextEmbedderService call
         self.notify(f"{feature} is not wired up yet - this is the UI shell.", "info")
 
     # --- layout --------------------------------------------------------------

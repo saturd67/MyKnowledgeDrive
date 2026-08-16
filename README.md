@@ -3,15 +3,15 @@
 MyKnowledgeDrive turns a folder of personal notes on Google Drive (docx files,
 screenshots, code snippets, cheat sheets, etc.) into a locally searchable
 knowledge base. It converts everything to plain text, embeds it into a local
-vector database, and gives you a small CLI to semantically search across it —
-picking a result jumps straight to the file on Google Drive.
+vector database, and gives you a small desktop app to semantically search
+across it — picking a result jumps straight to the file on Google Drive.
 
 It's a single-user, local-first tool: everything runs on your machine, the
 only network calls are to the Google Drive API to resolve file IDs.
 
 ## How it works
 
-The pipeline has three stages, plus two small CLI "portals" on top:
+The pipeline has three stages, plus a Flet desktop UI with two "portals" on top:
 
 ```
 resources/files/          resources/converted_files/    resources/my_chroma_store/
@@ -23,9 +23,9 @@ resources/files/          resources/converted_files/    resources/my_chroma_stor
    OtherFile (code/    │      (components/                (sentence-transformers        │
     text/config)      ─┘       FileManager.py)              "all-MiniLM-L6-v2")          │
    UnknownFile (skip)                                                                    ▼
-                                                                                   user_portal.py
+                                                                                    user portal UI
 FileFetcherService walks the Drive folder (read-only) to map                     search → pick file
-each local file to its Drive file ID + relative path, so                          → opens in Chrome
+each local file to its Drive file ID + relative path, so                          → opens in Drive
 Chroma document IDs double as "open in Drive" links.
 ```
 
@@ -53,10 +53,7 @@ Chroma document IDs double as "open in Drive" links.
 ## Project layout
 
 ```
-admin_portal.py          Interactive CLI to rebuild/inspect the knowledge base
-user_portal.py            Interactive CLI to search it and open results
 my_knowledge_base_portal.py  Flet entry point for the desktop UI (both portals)
-main.py                   Standalone script: lists Drive file IDs/paths (debug utility)
 view/
   main.py                 Front door: `main` (Flet target) and `start(page, portal)`
   theme.py                Palette, spacing/radius tokens, the Flet theme (light only)
@@ -85,8 +82,6 @@ resources/
   my_chroma_store/        Chroma's persistent vector DB files (gitignored, generated)
   knowledge_drive.db      SQLite database (gitignored, generated on first run)
 existing_file_types       Reference notes: MIME type -> conversion pipeline
-run_admin_portal.bat      Windows launcher for admin_portal.py
-run_user_portal.bat       Windows launcher for user_portal.py
 run_user_portal_ui.bat    Windows launcher for my_knowledge_base_portal.py
 plans/                    Design docs, one per table/feature (settings-table.md is implemented)
 ```
@@ -102,51 +97,19 @@ plans/                    Design docs, one per table/feature (settings-table.md 
   `C:/secrets/my_knowledge_drive_service_account.json`. That path and the
   target folder id are settings — seeded into `resources/knowledge_drive.db`
   on first run and editable from the admin portal's Settings screen.
-- Google Chrome installed at the default Windows path — `user_portal.py`
-  opens search results in Chrome using a hardcoded profile (`"Profile 1"`).
 - `flet==0.28.3` and `flet-desktop==0.28.3` (already installed in `.venv`) —
-  only needed for the desktop UI, not for the CLIs.
+  required to run the app.
 
 ## Usage
-
-### Admin portal — build/inspect the knowledge base
-
-```
-run_admin_portal.bat
-```
-
-- **Sync collections** — the everyday option. Reconverts only files whose
-  local mtime is newer than their existing converted `.txt` (or that have
-  no converted `.txt` yet), then diffs the Drive listing against the Chroma
-  collection by `modifiedTime` to add new files, upsert changed ones, and
-  delete ones no longer on Drive. Logs a summary of added/updated/removed/
-  unchanged counts.
-- **Reset collections** — wipes `resources/converted_files/` and the Chroma
-  collection, then reconverts every file in `resources/files/` and
-  re-embeds everything from scratch. Use this for a clean rebuild (e.g.
-  first run, or if the collection is suspected to be out of sync).
-- **Check collections** — prints the total embedded document count and a
-  paginated list of `id: label` entries.
-
-### User portal — search the knowledge base
-
-```
-run_user_portal.bat
-```
-
-Type a query; the top 5 semantic matches are shown as a menu of file paths.
-Picking one opens `https://drive.google.com/file/d/<id>` in Chrome.
-
-### Desktop UI (Flet) — layout only
 
 ```
 run_user_portal_ui.bat
 ```
 
-A Flet rewrite of both portals. **Settings is wired to the database; every
-other screen is still presentation only** — they render from
-`view/mock_data.py`, and their actions show a "not wired up yet" toast marked
-with a `TODO` pointing at the CLI method they should eventually call.
+**Settings is wired to the database; every other screen is still presentation
+only** — they render from `view/mock_data.py`, and their actions show a "not
+wired up yet" toast marked with a `TODO` pointing at the service call they
+should eventually make.
 
 One launcher covers both portals: it opens on the user portal, and a narrow
 rail down the far-left edge switches to the admin portal in place.
@@ -170,17 +133,34 @@ remove it once the real logic is wired in.
 The search screen has "searching" and "no results" states built in
 (`view/user/search_view.py`) that are unreachable until the query is wired up.
 
-### main.py
+### The operations behind the admin screens
 
-A standalone debug utility that just runs `FileFetcherService` and prints
-every file path found under the configured Drive folder — useful for
-verifying Drive access/credentials without running a full conversion or
-embedding pass.
+These are implemented in the services layer and are what the *Sync & Reset*
+and *Collections* screens need to be wired to:
+
+- **Sync** — the everyday option. `FileConverterService.sync_convert_files()`
+  reconverts only files whose local mtime is newer than their existing
+  converted `.txt` (or that have no converted `.txt` yet), then
+  `TextEmbedderService.sync_collection()` diffs the Drive listing against the
+  Chroma collection by `modifiedTime` to add new files, upsert changed ones,
+  and delete ones no longer on Drive. Logs a summary of added/updated/
+  removed/unchanged counts.
+- **Reset** — `FileConverterService.start_convert_files()` plus
+  `TextEmbedderService.reset_collection()` and `embed_collection()` wipe
+  `resources/converted_files/` and the Chroma collection, then reconvert every
+  file in `resources/files/` and re-embed from scratch. Use this for a clean
+  rebuild (e.g. first run, or if the collection is suspected to be out of sync).
+- **Check** — `TextEmbedderService.check_total_collection()` and
+  `check_collection(page)` give the total embedded document count and a
+  paginated list of `id: label` entries.
+- **Search** — `TextEmbedderService.query(text)` returns the top matches; each
+  result's id is a Drive file id, so `https://drive.google.com/file/d/<id>`
+  opens the source file.
 
 ## Known limitations
 
 - `resources/files/` must be kept in sync with the Drive folder manually
   (e.g. via Google Drive for Desktop) — nothing in this repo downloads file
-  content from Drive, only metadata (id + path). **Sync collections** only
+  content from Drive, only metadata (id + path). **Sync** only
   detects changes already present in `resources/files/` and on Drive; it
   doesn't pull new file content from Drive itself.

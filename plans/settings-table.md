@@ -161,8 +161,8 @@ leaves the Settings screen as an editable row and becomes a plain `w.kv_row`.
   database was open, and made a missing key file break the import rather than
   the run.
 - **`SettingService.initialise()` is explicit, called once per process at the
-  top of each entry point** (`admin_portal.py`, `user_portal.py`, `main.py`,
-  `my_knowledge_base_portal.py`), not a lazy check inside every `get`/`set`.
+  top of the entry point** (`my_knowledge_base_portal.py`), not a lazy check
+  inside every `get`/`set`.
   The first design checked `self._initialised` on every `get_all()` and
   `set_many()` call; that meant every future DB-touching method would have to
   remember the same check, and paid for a branch that is only ever false after
