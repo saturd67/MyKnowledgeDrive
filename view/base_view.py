@@ -14,7 +14,7 @@ from abc import ABC, abstractmethod
 
 import flet as ft
 
-from view.portal import Portal
+from view.protocols.portal import Portal
 from view.theme import palette
 
 

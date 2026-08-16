@@ -5,7 +5,7 @@ import flet as ft
 from view import mock_data as data
 from view import widgets as w
 from view.base_view import BaseView
-from view.portal import SearchPortal
+from view.protocols.portal import SearchPortal
 from view.theme import Radius, Space, tone
 
 
