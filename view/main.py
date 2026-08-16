@@ -15,10 +15,10 @@ def start(page, portal=DEFAULT_PORTAL, set_window=True):
     back into here, so module-level imports would cycle.
     """
     if portal == "admin":
-        from view.admin.app import AdminPortal
+        from view.admin.shell import AdminPortal
         AdminPortal(page).start(set_window=set_window)
     else:
-        from view.user.app import UserPortal
+        from view.user.shell import UserPortal
         UserPortal(page).start(set_window=set_window)
 
 

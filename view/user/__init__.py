@@ -1,1 +1,1 @@
-"""User portal screens."""
+"""User portal - the shell plus its screens."""

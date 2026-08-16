@@ -10,7 +10,7 @@ from view import portal_rail
 from view import theme
 from view import widgets as w
 from view.theme import Space, palette
-from view.user import search_view
+from view.user.screens import search_view
 
 
 class UserPortal:

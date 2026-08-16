@@ -8,7 +8,7 @@ import flet as ft
 from view import portal_rail
 from view import theme
 from view import widgets as w
-from view.admin import collections_view, settings_view, sync_view
+from view.admin.screens import collections_view, settings_view, sync_view
 from view.theme import Radius, Space, palette
 
 NAV_ITEMS = [
