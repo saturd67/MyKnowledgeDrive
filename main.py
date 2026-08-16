@@ -18,4 +18,3 @@ if __name__ == "__main__":
     results = file_fetcher_service.start_file_id_fetching()
     for result in results:
         print(result.get("file"))
-        print("test")
