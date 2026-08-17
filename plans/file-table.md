@@ -4,8 +4,17 @@
 `view → services/FileService.py → repository/FileRepository.py →
 services/DatabaseService.py`: all SQL for this table lives in the repository,
 `DatabaseService` only hands out connections, and `FileService` owns the
-mapping between a scan result and a row. The screen is
-`view/admin/screens/library_sync_view.py` (Library Sync → Scan for changes).
+mapping between a scan result and a row.
+
+**Two admin screens read this table, and neither of them owns it:**
+
+| screen | reads | writes |
+| --- | --- | --- |
+| `view/admin/screens/library_sync_view.py` | the cached rows, for the first paint of the review tree | yes — every scan and every apply |
+| `view/admin/screens/library_view.py` | the embedded rows, as the whole Library listing | never |
+
+Library Sync is the writer; Library is a pure reader that today renders from
+`view.mock_data.DOCUMENTS` and is the screen this table most directly replaces.
 
 Second table of the SQLite database. Scope: a registry of every file the app
 knows about, so the review screen can render the last known state immediately
@@ -49,6 +58,14 @@ worse, a stale `removed` row would delete a live document. The rule:
 - the screen shows cached rows greyed as "last seen at ..." until the scan
   returns, then replaces them.
 
+The Library screen is the place this is easiest to get wrong, because it states
+the cache as a fact: "312 documents embedded in my_knowledge_drive" is a claim
+about Chroma, rendered from rows. It stays honest only if the screen says *when*
+— the subtitle needs an "as of *last scan*" clause once it reads real rows, and
+the Refresh button must not be allowed to imply it verified anything against
+Chroma. A Library that quietly disagrees with the collection is worse than one
+that admits it is a snapshot.
+
 That is also why the scan result itself is **not** persisted as a re-appliable
 plan. Pre-ticked checkboxes from last week would act on a state that no longer
 holds.
@@ -81,15 +98,15 @@ CREATE TABLE file (
 | column | holds |
 | --- | --- |
 | `file_key` | the join key — input-relative, backslash separated, **no** leading separator, **no** extension (`Docker\Notes`) |
-| `drive_id` | the Drive file id, which is also the Chroma document id. `NULL` when the file is not on Drive |
+| `drive_id` | the Drive file id, which is also the Chroma document id — the "Document id" column of the Library listing. `NULL` when the file is not on Drive |
 | `source_extension` | `.docx`, `.png`, ... Kept because `file_key` has it stripped |
-| `file_type` | drives `w.file_icon()` in `view/widgets.py:424` — same five values the screen already uses |
+| `file_type` | drives `widgets.FileIcon` (`view/widgets/blocks.py:240`) on both screens, and the tone of the Library's Type pill through `_kind_tone` (`library_view.py:27`) |
 | `is_supported` | 0 for anything `OutputFileFactory` routes to `UnknownFile` |
 | `drive_modified_date` | Drive's `modifiedTime` as of the last scan |
 | `converted_date` | when we last wrote the `.txt` |
 | `embedded_date` | when we last upserted the document |
 | `embedded_modified_date` | the `modifiedTime` we stored *in Chroma* at that upsert — the value the diff compares against |
-| `status` | the status last computed for this file by a scan (see the status table in `selective-sync.md`) |
+| `status` | the status last computed for this file by a scan. The vocabulary is `STATUS_META` in `library_sync_view.py:52` — `added`, `updated`, `stale_local`, `removed`, `no_drive_id`, `no_source`, `unsupported`, `unchanged` — which also maps each one to its row label, tone and review group |
 | `last_scanned_date` | when that status was computed |
 
 No extra index. `UNIQUE (file_key)` gives the lookup index, and the corpus is
@@ -155,7 +172,9 @@ information ("new file"), not a misconfiguration.
 
 ---
 
-## How the screen uses it
+## How the screens use it
+
+### Library Sync — the writer
 
 - **On open** — `SELECT * FROM file WHERE is_active = 1`, painted as the
   last-known tree with a "last scanned at ..." note. No Drive call, so the
@@ -172,6 +191,54 @@ information ("new file"), not a misconfiguration.
 
 The upsert is all-or-nothing in one transaction, the same shape as
 `SettingRepository.update_values` (`repository/SettingRepository.py:46`).
+
+### Library — the reader
+
+`library_view.py` renders one screen-wide folder tree of everything that is in
+the collection. It is the closest thing this schema has to a `SELECT *` screen,
+and it needs exactly one statement:
+
+```sql
+SELECT drive_id, file_key, file_type
+  FROM file
+ WHERE is_active = 1
+   AND embedded_date IS NOT NULL
+ ORDER BY LOWER(file_key);
+```
+
+Three columns, and they line up one-for-one with the tuples in
+`mock_data.DOCUMENTS` — `(document id, path, kind)` — so swapping the mock for
+the query is a change of source, not of layout:
+
+| listing column | column | rendered by |
+| --- | --- | --- |
+| Name, and the folders above it | `file_key`, split on `\` at render time | `_tree`, `_folder_row`, `_doc_row` |
+| Document id | `drive_id`, in the mono face | `library_view.py:280` |
+| Type | `file_type`, as an icon and a pill | `widgets.FileIcon`, `_kind_tone` |
+
+**`embedded_date IS NOT NULL` is what "in the Library" means.** The screen's
+subtitle reads "N documents embedded in *collection*", so a row that exists but
+has never been embedded — anything `blocked` on the sync screen, and every
+`added` row between a scan and its apply — must not appear here. `is_active = 1`
+alone would list files this app has merely *seen*, which is a different screen.
+`drive_id IS NOT NULL` needs no separate clause: a row cannot have been embedded
+without one, so `embedded_date` implies it.
+
+The three stat cards need no extra query and no extra column:
+
+- **Total documents** — the length of that result.
+- **Matching filter** — the filter is applied in Python over the same rows
+  (`_filtered`, matching path *or* id), never as a `LIKE`. At ~350 rows a
+  round trip per keystroke would be slower than the scan it replaces, and the
+  filter has to stay live while typing.
+- **Top-level folders**, with "N in total" — both counted off the tree built
+  from `file_key` (`_folder_count`), which is the same reason there is
+  [no `folder` column](#decisions-taken-while-designing).
+
+**Refresh** (`library_view.py:49`) re-runs the query above and nothing else. It
+is a re-read of this table, **not** a scan: it must not touch Drive or Chroma,
+or the two buttons on the two screens would do the same expensive thing under
+different names. What makes the numbers current is a scan on Library Sync.
 
 ---
 
@@ -200,11 +267,24 @@ The upsert is all-or-nothing in one transaction, the same shape as
   so storing them buys nothing and creates a second place for staleness to
   hide. `converted_date` records what we did; the mtimes stay on disk.
 - **`file_type` is stored, not derived at read time.** It is a pure function of
-  the extension, so it could be computed — but the screen renders it for cached
-  rows before any scan runs, and a `CHECK` constraint keeps it honest.
-- **No `folder` column.** The tree in `library_sync_view.py` splits `file_key` on the
-  separator at render time. A folder column would be a denormalised prefix that
-  has to be kept in step on every rename.
+  the extension, so it could be computed — but both screens render it for cached
+  rows before any scan runs, and a `CHECK` constraint keeps it honest. Note the
+  `CHECK` allows five values while `FileIcon.KINDS` maps four: `unknown` has no
+  entry and falls through to the `text` icon (`blocks.py:251`). That is
+  deliberate on the sync screen, where an unsupported file is already carrying a
+  red Blocked pill that says more than an icon could — but `unknown` rows never
+  reach the Library, so the fallback is never load-bearing there.
+- **No `folder` column.** Both trees — `_tree` in `library_sync_view.py` and the
+  identical one in `library_view.py` — split `file_key` on the separator at
+  render time, and `library_view.py` counts its "Top-level folders" card off the
+  result. A folder column would be a denormalised prefix that has to be kept in
+  step on every rename, to save a `str.split` over ~350 rows.
+- **The Library needs no columns of its own.** It was worth checking, since it
+  is the one screen designed after this table was drafted: its listing, its
+  filter, its three stat cards and both row actions are all served by
+  `file_key`, `drive_id` and `file_type`. "Copy document id" and "Open in Google
+  Drive" (`library_view.py:286-289`) are both just `drive_id` — the Drive URL is
+  built from it, not stored.
 
 ## Still open
 
@@ -231,6 +311,17 @@ The upsert is all-or-nothing in one transaction, the same shape as
 4. **Two portals open at once** will each write scan results. Only the admin
    portal scans today, and the upsert is idempotent, so the last writer wins
    harmlessly — worth revisiting if that stops being true.
+5. **The Library has no "never scanned" empty state.** `_listing` only handles
+   an empty *filter* result, and says "Try a shorter path fragment"
+   (`library_view.py:129-133`). Against a real empty table — a fresh install,
+   before the first scan — that message blames a filter the user never typed.
+   It wants a second empty state pointing at Library Sync, and that is a UI
+   change this table forces rather than a schema question.
+6. **Deactivated rows keep their `embedded_date`,** so a row that is
+   `is_active = 0` still satisfies the Library's `embedded_date IS NOT NULL`
+   and is held out only by the `is_active = 1` clause. That is correct — the
+   date records what we did, and clearing it would destroy history — but it
+   means the two conditions are not redundant and both must stay in the query.
 
 ---
 
@@ -241,15 +332,20 @@ The upsert is all-or-nothing in one transaction, the same shape as
    `UnknownFile.SUPPORTED = False`, so there is one definition of `file_key`
    before anything persists one.
 3. `repository/FileRepository.py` → the DDL and every statement: `initialise`
-   (create only, no seed), `find_all_active`, `upsert_many`,
-   `deactivate_missing`, `mark_applied`. Like `SettingRepository`, it returns
-   what it could not do rather than raising domain errors.
+   (create only, no seed), `find_all_active`, `find_all_embedded`,
+   `upsert_many`, `deactivate_missing`, `mark_applied`. Like
+   `SettingRepository`, it returns what it could not do rather than raising
+   domain errors.
 4. `services/FileService.py` → maps `FileChange` objects to rows and back;
    owns nothing else.
 5. `services/SyncPlannerService.py` → calls `FileService` after a scan and
    after an apply. The planner decides; the service records.
 6. `view/admin/screens/library_sync_view.py` → first paint from the cached rows, replaced when
    the scan returns.
+7. `view/admin/screens/library_view.py` → drop `mock_data.DOCUMENTS` for
+   `find_all_embedded()`, add the "never scanned" empty state, and date the
+   subtitle. Last, on purpose: it is read-only, so it is the safest step, and
+   until step 5 runs a real scan there is nothing in the table for it to show.
 
 Then, separately and one at a time: `plans/sync-run-table.md` (one row per run)
 and `plans/sync-run-file-table.md` (per-file detail of a run, joining

@@ -5,10 +5,16 @@
 services/DatabaseService.py`: all SQL for this table lives in the repository,
 `DatabaseService` only hands out connections, and `SettingService` owns
 caching, path resolution and errors. Keys and seed values are in
-`constant/settings.py`; the screen is `view/admin/settings_view.py`.
+`constant/settings.py`; the screen is `view/admin/screens/settings_view.py`.
 
 First table of the SQLite database. Scope: hold the configuration values the
-Settings screen (`view/admin/settings_view.py`) shows and edits. Nothing else.
+Settings screen (`view/admin/screens/settings_view.py`) shows and edits. Nothing else.
+
+Settings is one of the three admin screens, all under `view/admin/screens/` and
+wired up in `view/admin/shell.py`: **Library** (`library_view.py`), **Library
+Sync** (`library_sync_view.py`) and **Settings**. The other two read this table
+on every render but never write to it — see
+[How the screens use it](#how-the-screens-use-it).
 
 DB file: `resources/knowledge_drive.db`, exposed as `DB_PATH` in
 `constant/paths.py`. Gitignored like the rest of `resources/`.
@@ -123,8 +129,9 @@ Inserted once, when the database is created:
 | `embedding.collection` | `my_knowledge_drive` | read-only |
 | `embedding.results_per_query` | `5` | editable |
 
-"Editable" vs "read-only" is a UI decision (`w.editable_row` vs `w.kv_row`), not
-a column — the table stores all nine the same way.
+"Editable" vs "read-only" is a UI decision (`widgets.EditableRow` vs
+`widgets.KvRow`, both in `view/widgets/blocks.py`), not a column — the table
+stores all nine the same way.
 
 **The three paths are seeded relative to the project root**, not as the absolute
 strings `constant/paths.py` builds today. `BASE_DIR` is computed from
@@ -132,17 +139,36 @@ strings `constant/paths.py` builds today. `BASE_DIR` is computed from
 the database and break if the folder ever moves. `BASE_DIR` therefore stays in
 code as "where the app is installed" — it is not configuration — and the app
 resolves `BASE_DIR / value` at read time. That also means `paths.base_dir`
-leaves the Settings screen as an editable row and becomes a plain `w.kv_row`.
+leaves the Settings screen as an editable row and becomes a plain
+`widgets.KvRow` (`settings_view.py:198`).
 
 ---
 
-## How the screen uses it
+## How the screens use it
+
+**Settings** — the only writer:
 
 - **Load** — `SELECT key, value FROM setting WHERE is_active = 1`.
 - **Save** — one `UPDATE ... SET value, updated_at WHERE key = ?` per changed
   field, in a single transaction.
 - **Revert** — no DB call. It discards unsaved edits in the form, so it just
   re-renders from the last loaded values.
+
+**Library** and **Library Sync** — readers, through the cached
+`settingService.get(...)`, not through SQL of their own:
+
+| where | key | rendered as |
+| --- | --- | --- |
+| `library_view.py:46` | `embedding.collection` | the page subtitle, "N documents embedded in ..." |
+| `library_sync_view.py:991,1007` | `embedding.collection` | the "Collection" row of the scan / run panel |
+| `library_sync_view.py:1008,1226` | `embedding.model` | the "Embedding model" row of the run and confirm panels |
+| `library_sync_view.py:1146` | `embedding.collection` | "Chroma collection ..." in the reset impact list |
+
+Every one of those is read **inside `build()`**, so a saved setting shows up on
+the other screens the next time they render, with no invalidation step. That is
+the payoff of `SettingService` holding one process-wide cache, and it is why
+`_wipes()` is a method rather than a module constant (`library_sync_view.py:1141`)
+— a module constant would have frozen the collection name at import time.
 
 ---
 
@@ -161,7 +187,7 @@ leaves the Settings screen as an editable row and becomes a plain `w.kv_row`.
   database was open, and made a missing key file break the import rather than
   the run.
 - **`SettingService.initialise()` is explicit, called once per process at the
-  top of the entry point** (`my_knowledge_base_portal.py`), not a lazy check
+  top of the entry point** (`main.py:14`, before `ft.app()`), not a lazy check
   inside every `get`/`set`.
   The first design checked `self._initialised` on every `get_all()` and
   `set_many()` call; that meant every future DB-touching method would have to
@@ -177,8 +203,16 @@ leaves the Settings screen as an editable row and becomes a plain `w.kv_row`.
    Settings entirely from the table would need `group`, `label` and
    `display_order` columns. `settings_view.py` hardcodes all three today, which
    is fine while the set of settings is fixed.
-2. **`ui.page_size`** (the Library 10/25/50 dropdown) is a persisted
-   preference rather than configuration. Same table, or its own?
+2. **~~`ui.page_size`~~ — closed by the Library rewrite.** The 10/25/50
+   dropdown it referred to no longer exists: the Library is a folder tree you
+   drill into, not a paged list, so there is no page size to persist. What
+   replaced it is genuinely session state — `library_filter` and
+   `library_folders_open` in `AdminPortal.state` (`view/admin/shell.py:29-32`)
+   — and it stays there. A filter that survived a restart would silently hide
+   documents on the next open, and remembering which folders were expanded is
+   not worth a table when the tree opens collapsed by design. **No UI
+   preference belongs in `setting` today**; if one ever does, it wants its own
+   table rather than sharing a source-of-truth table with configuration.
 3. **Two portals open at once** each hold their own `SettingService` cache, so
    one will not see the other's save until it calls `reload()`. Harmless today
    (only the admin portal writes); worth revisiting if the user portal ever

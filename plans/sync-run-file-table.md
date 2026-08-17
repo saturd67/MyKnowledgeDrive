@@ -51,9 +51,10 @@ are the ones where they disagree.** A file ticked as `updated` that comes back
 `skipped` means its converted text went missing between the scan and the apply;
 that is a diagnosis you cannot make from either column alone.
 
-`status` carries no `CHECK`. Its vocabulary is the scan's, defined in
-`selective-sync.md`, and it will grow as the scan learns to tell more cases
-apart — a constraint here would mean a migration every time. `action` is this
+`status` carries no `CHECK`. Its vocabulary is the scan's, listed in
+`STATUS_META` (`library_sync_view.py:52`) and documented in
+[`file-table.md`](file-table.md#ddl), and it will grow as the scan learns to
+tell more cases apart — a constraint here would mean a migration every time. `action` is this
 table's own vocabulary and is small and closed, so it is constrained.
 
 ### The two constraints
@@ -157,9 +158,18 @@ detail is discarded. Reads filter `WHERE is_active = 1` regardless.
    `sync_run` was deliberately given denormalised counts so its summaries
    survive this table being thinned — the mechanism is designed for, but not
    built. A "keep detail for the last N runs" job is the obvious shape.
-2. **No screen reads it yet.** Nothing in `library_sync_view.py` shows per-file
-   history; the query above is written but unused. Worth deciding whether this
-   table is built now or when that screen is, because until then it is write-only.
+2. **No screen reads it yet, but there is now a place to put one.** Nothing in
+   `library_sync_view.py` shows per-file history; the query above is written
+   but unused. What changed is the Library: each document row ends in a fixed
+   88px action cluster holding two icon buttons — Copy document id and Open in
+   Google Drive (`library_view.py:284-293`) — and a third, History, opening a
+   panel of that file's runs is the natural first reader. It is also the only
+   screen that can offer it, since Library Sync shows a *scan result*, which is
+   about right now, while this table is about what happened before.
+
+   That still does not settle whether the table is built now or with that
+   panel. Until it is read, it is write-only, and a `reset` writes ~350 rows
+   into it every time.
 3. **`status` is unconstrained**, so a typo in the scan's vocabulary would be
    stored silently. A lookup table would fix it and is almost certainly not
    worth a fourth join.
@@ -187,12 +197,12 @@ enforced, so neither order is optional.
 
 ## The schema, complete
 
-| table | rows | purpose |
-| --- | --- | --- |
-| [`setting`](settings-table.md) | ~10 | configuration. Implemented |
-| [`file`](file-table.md) | ~350 | per-file registry; instant first paint |
-| [`sync_run`](sync-run-table.md) | one per run | what each run did |
-| `sync_run_file` | ~350 per reset | which files, and what happened to each |
+| table | rows | purpose | read by |
+| --- | --- | --- | --- |
+| [`setting`](settings-table.md) | ~10 | configuration. Implemented | all three admin screens |
+| [`file`](file-table.md) | ~350 | per-file registry; instant first paint | Library, Library Sync |
+| [`sync_run`](sync-run-table.md) | one per run | what each run did | Library Sync |
+| `sync_run_file` | ~350 per reset | which files, and what happened to each | nothing yet |
 
 Nothing else is planned. The vector store stays in Chroma and the converted
 text stays on disk; SQLite holds configuration and history, never content.
