@@ -20,6 +20,11 @@ from view.theme import palette
 
 class BaseView(ABC):
 
+    # Whether the shell puts the whole screen in a page-level scroll. A screen
+    # that scrolls a list of its own sets this False, fills the viewport and
+    # keeps its scrollbar inside that list.
+    scrolls = True
+
     def __init__(self, portal: Portal):
         self.portal = portal
         # Light mode only, and the instance is thrown away after one build,

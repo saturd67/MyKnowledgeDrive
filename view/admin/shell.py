@@ -26,9 +26,10 @@ class AdminPortal:
         self.page = page
         self.index = 0
         self.state = {
-            "library_page": 1,
             "library_filter": "",
-            "page_size": 10,
+            # Folder path -> bool. Absent means closed, so only the folders you
+            # actually opened are tracked.
+            "library_folders_open": {},
             "sync_mode": "sync",     # sync | reset
             # idle -> scanning -> reviewing -> updating -> done
             "sync_stage": "idle",
@@ -111,10 +112,14 @@ class AdminPortal:
         return view_class(self).build()
 
     def _content(self):
+        """Wrapped in a page scroll unless the screen scrolls something of its
+        own. Only navigate() swaps screens, and that re-renders, so reading the
+        flag once here is enough."""
+        scrolls = NAV_ITEMS[self.index][3].scrolls
         return ft.Container(
             content=ft.Column(
                 [self._body],
-                scroll=ft.ScrollMode.AUTO,
+                scroll=ft.ScrollMode.AUTO if scrolls else None,
                 expand=True,
             ),
             padding=ft.padding.symmetric(horizontal=Space.XXL, vertical=Space.XXL),

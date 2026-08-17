@@ -24,7 +24,11 @@ class Card(ft.Container):
 class Section(Card):
     """A titled card: heading row on top, arbitrary content below."""
 
-    def __init__(self, title_text, subtitle_text=None, trailing=None, content=None, **kwargs):
+    def __init__(self, title_text, subtitle_text=None, trailing=None, content=None,
+                 fill=False, **kwargs):
+        """`fill` stretches the content to whatever height the card is given,
+        which is what a section whose content scrolls itself needs - the
+        heading stays put and only the content moves."""
         head = [ft.Text(title_text, size=15, weight=ft.FontWeight.W_700, color=palette().text)]
         if subtitle_text:
             head.append(Subtitle(subtitle_text, size=12))
@@ -39,9 +43,10 @@ class Section(Card):
 
         children = [header_row]
         if content is not None:
-            children.append(ft.Container(content=content, padding=ft.padding.only(top=Space.LG)))
+            children.append(ft.Container(content=content, padding=ft.padding.only(top=Space.LG),
+                                         expand=fill))
 
-        super().__init__(ft.Column(children, spacing=0), **kwargs)
+        super().__init__(ft.Column(children, spacing=0, expand=fill), **kwargs)
 
 
 class IconBadge(ft.Container):
