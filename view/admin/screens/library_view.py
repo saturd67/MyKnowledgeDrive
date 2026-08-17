@@ -1,4 +1,4 @@
-"""Collections: paginated browser over the embedded documents."""
+"""Library: paginated browser over the embedded documents."""
 
 import flet as ft
 
@@ -12,26 +12,26 @@ from view.theme import Radius, Space
 PAGE_SIZES = [10, 25, 50]
 
 
-class CollectionsView(BaseView):
+class LibraryView(BaseView):
 
     def build(self):
         rows = self._filtered()
         page_size = self.state["page_size"]
         total_pages = max(1, -(-len(rows) // page_size))
-        current = min(self.state["collections_page"], total_pages)
-        self.state["collections_page"] = current
+        current = min(self.state["library_page"], total_pages)
+        self.state["library_page"] = current
         visible = rows[(current - 1) * page_size: current * page_size]
 
         return ft.Column(
             [
                 widgets.PageHeader(
-                    "Collections",
+                    "Library",
                     f"{len(data.DOCUMENTS)} documents embedded in {settingService.get(EMBEDDING_COLLECTION)}.",
                     actions=[
                         widgets.GhostButton(
                             "Refresh",
                             icon=ft.Icons.REFRESH_ROUNDED,
-                            on_click=lambda _: self.not_implemented("Refresh collections"),
+                            on_click=lambda _: self.not_implemented("Refresh library"),
                         ),
                     ],
                 ),
@@ -65,7 +65,7 @@ class CollectionsView(BaseView):
         )
 
     def _filtered(self):
-        needle = self.state["collections_filter"].strip().lower()
+        needle = self.state["library_filter"].strip().lower()
         if not needle:
             return data.DOCUMENTS
         return [d for d in data.DOCUMENTS if needle in d[1].lower() or needle in d[0].lower()]
@@ -74,17 +74,17 @@ class CollectionsView(BaseView):
         p = self.p
 
         def on_filter(e):
-            self.state["collections_filter"] = e.control.value
-            self.state["collections_page"] = 1
+            self.state["library_filter"] = e.control.value
+            self.state["library_page"] = 1
             self.refresh()
 
         def on_page_size(e):
             self.state["page_size"] = int(e.control.value)
-            self.state["collections_page"] = 1
+            self.state["library_page"] = 1
             self.refresh()
 
         search = ft.TextField(
-            value=self.state["collections_filter"],
+            value=self.state["library_filter"],
             hint_text="Filter by path or id",
             hint_style=ft.TextStyle(size=12, color=p.text_faint),
             prefix_icon=ft.Icons.SEARCH_ROUNDED,
@@ -206,13 +206,13 @@ class CollectionsView(BaseView):
 
         def go(delta):
             def handler(_):
-                self.state["collections_page"] = max(1, min(total_pages, current + delta))
+                self.state["library_page"] = max(1, min(total_pages, current + delta))
                 self.refresh()
             return handler
 
         def jump(index):
             def handler(_):
-                self.state["collections_page"] = index
+                self.state["library_page"] = index
                 self.refresh()
             return handler
 

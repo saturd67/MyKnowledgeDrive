@@ -157,7 +157,7 @@ detail is discarded. Reads filter `WHERE is_active = 1` regardless.
    `sync_run` was deliberately given denormalised counts so its summaries
    survive this table being thinned — the mechanism is designed for, but not
    built. A "keep detail for the last N runs" job is the obvious shape.
-2. **No screen reads it yet.** Nothing in `sync_view.py` shows per-file
+2. **No screen reads it yet.** Nothing in `library_sync_view.py` shows per-file
    history; the query above is written but unused. Worth deciding whether this
    table is built now or when that screen is, because until then it is write-only.
 3. **`status` is unconstrained**, so a typo in the scan's vocabulary would be

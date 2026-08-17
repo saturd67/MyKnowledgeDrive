@@ -177,7 +177,7 @@ leaves the Settings screen as an editable row and becomes a plain `w.kv_row`.
    Settings entirely from the table would need `group`, `label` and
    `display_order` columns. `settings_view.py` hardcodes all three today, which
    is fine while the set of settings is fixed.
-2. **`ui.page_size`** (the Collections 10/25/50 dropdown) is a persisted
+2. **`ui.page_size`** (the Library 10/25/50 dropdown) is a persisted
    preference rather than configuration. Same table, or its own?
 3. **Two portals open at once** each hold their own `SettingService` cache, so
    one will not see the other's save until it calls `reload()`. Harmless today

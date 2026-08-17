@@ -1,6 +1,6 @@
 """Placeholder data used to lay out the portals.
 
-The Collections, Sync & Reset and search screens still render from these
+The Library, Library Sync and search screens still render from these
 constants so they can be reviewed without a Drive connection, a Chroma store
 or an embedding model.
 

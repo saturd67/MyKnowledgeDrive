@@ -5,7 +5,7 @@
 services/DatabaseService.py`: all SQL for this table lives in the repository,
 `DatabaseService` only hands out connections, and `SyncRunService` owns opening
 a run, closing it, and reading the history back. The screen is
-`view/admin/sync_view.py` (the "Last run summary" panel).
+`view/admin/screens/library_sync_view.py` (the "Last run summary" panel).
 
 Third table of the SQLite database. Scope: one row per pipeline run — a scan,
 an update, or a reset — with what it did and how it ended. Nothing per-file;
@@ -27,7 +27,7 @@ warning.** A run happened at a point in time; nothing about the world can make
 "the update at 10:24 embedded 17 documents" untrue later.
 
 That is what makes it safe to read straight onto the screen. Today the summary
-panel renders from `portal.state["sync_result"]` (`view/admin/sync_view.py`),
+panel renders from `portal.state["sync_result"]` (`view/admin/screens/library_sync_view.py`),
 which is session state — close the window and the record of what you just did
 is gone. A row here survives that, and can never mislead the way a stale
 `file.status` could.
@@ -148,7 +148,7 @@ panel already renders as its `empty_state`.
   something in the current session.
 - **On dispatch** — insert, keep the returned `id` in `portal.state` for the
   duration of the run.
-- **On finish** — one update. `_play()` in `sync_view.py` already distinguishes
+- **On finish** — one update. `_play()` in `library_sync_view.py` already distinguishes
   a completed run from a cancelled one, so `outcome` comes straight from its
   return value.
 - **On a stale `running` row at startup** — leave it. It is displayed as
@@ -209,7 +209,7 @@ panel already renders as its `empty_state`.
    returned by `SyncPlannerService.apply()` onto columns.
 4. `view/admin/app.py` → `run_worker()` opens the run; the worker closes it in
    a `finally`, so a crash still records `failed` with the exception text.
-5. `view/admin/sync_view.py` → `_summary()` reads the latest row on open
+5. `view/admin/screens/library_sync_view.py` → `_summary()` reads the latest row on open
    instead of starting blank.
 
 Then, last: `plans/sync-run-file-table.md`, the per-file detail of a run,

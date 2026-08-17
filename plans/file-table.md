@@ -5,7 +5,7 @@
 services/DatabaseService.py`: all SQL for this table lives in the repository,
 `DatabaseService` only hands out connections, and `FileService` owns the
 mapping between a scan result and a row. The screen is
-`view/admin/sync_view.py` (Sync & Reset → Scan for changes).
+`view/admin/screens/library_sync_view.py` (Library Sync → Scan for changes).
 
 Second table of the SQLite database. Scope: a registry of every file the app
 knows about, so the review screen can render the last known state immediately
@@ -202,7 +202,7 @@ The upsert is all-or-nothing in one transaction, the same shape as
 - **`file_type` is stored, not derived at read time.** It is a pure function of
   the extension, so it could be computed — but the screen renders it for cached
   rows before any scan runs, and a `CHECK` constraint keeps it honest.
-- **No `folder` column.** The tree in `sync_view.py` splits `file_key` on the
+- **No `folder` column.** The tree in `library_sync_view.py` splits `file_key` on the
   separator at render time. A folder column would be a denormalised prefix that
   has to be kept in step on every rename.
 
@@ -248,7 +248,7 @@ The upsert is all-or-nothing in one transaction, the same shape as
    owns nothing else.
 5. `services/SyncPlannerService.py` → calls `FileService` after a scan and
    after an apply. The planner decides; the service records.
-6. `view/admin/sync_view.py` → first paint from the cached rows, replaced when
+6. `view/admin/screens/library_sync_view.py` → first paint from the cached rows, replaced when
    the scan returns.
 
 Then, separately and one at a time: `plans/sync-run-table.md` (one row per run)

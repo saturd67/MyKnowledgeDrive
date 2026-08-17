@@ -60,7 +60,7 @@ view/
   portal_rail.py          Far-left rail that swaps between the admin and user portals
   widgets.py              Shared presentational controls (cards, pills, log console, ...)
   mock_data.py            Placeholder data the screens render from
-  admin/                  Admin shell + Collections/Sync & Reset/Settings screens
+  admin/                  Admin shell + Library/Library Sync/Settings screens
   user/                   User shell + search screen
 components/
   FileManager.py          OutputFile subclasses (DocFile/ImageFile/OtherFile/UnknownFile) + factory
@@ -114,8 +114,8 @@ should eventually make.
 One launcher covers both portals: it opens on the user portal, and a narrow
 rail down the far-left edge switches to the admin portal in place.
 
-- **Admin UI** — sidebar with three screens: *Collections* (stat cards plus a
-  filterable, paginated table of `id`/`label`), *Sync & Reset* (one screen with
+- **Admin UI** — sidebar with three screens: *Library* (stat cards plus a
+  filterable, paginated table of `id`/`label`), *Library Sync* (one screen with
   a mode switch — sync shows the step list, run summary and log; reset swaps in
   the danger banner, impact breakdown, type-`RESET`-to-confirm gate and
   confirmation dialog), *Settings* (reads and writes the `setting` table —
@@ -127,7 +127,7 @@ rail down the far-left edge switches to the admin portal in place.
   alongside a detail panel with the Drive id, converted-text preview and an
   "Open in Google Drive" action.
 
-The *Sync & Reset* screen carries a small **Preview** dropdown so the idle /
+The *Library Sync* screen carries a small **Preview** dropdown so the idle /
 running / completed states can be reviewed while the actions are still stubs —
 remove it once the real logic is wired in.
 The search screen has "searching" and "no results" states built in
@@ -135,8 +135,8 @@ The search screen has "searching" and "no results" states built in
 
 ### The operations behind the admin screens
 
-These are implemented in the services layer and are what the *Sync & Reset*
-and *Collections* screens need to be wired to:
+These are implemented in the services layer and are what the *Library Sync*
+and *Library* screens need to be wired to:
 
 - **Sync** — the everyday option. `FileConverterService.sync_convert_files()`
   reconverts only files whose local mtime is newer than their existing

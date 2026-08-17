@@ -112,7 +112,7 @@ KEEPS = [
 ]
 
 
-class SyncView(BaseView):
+class LibrarySyncView(BaseView):
 
     def __init__(self, portal):
         super().__init__(portal)
@@ -127,9 +127,9 @@ class SyncView(BaseView):
         self._refs = {}
 
         heading, description = {
-            "sync": ("Sync collections",
+            "sync": ("Sync library",
                      "Scan for what changed, then update only the files you pick."),
-            "reset": ("Reset collections",
+            "reset": ("Reset library",
                       "Full rebuild - use it for a first run or when the store is out of sync."),
         }[mode]
 
@@ -274,7 +274,7 @@ class SyncView(BaseView):
         if mode == "reset":
             armed = self.state["reset_confirm"].strip() == CONFIRM_WORD
             return ft.FilledButton(
-                text="Reset collections",
+                text="Reset library",
                 icon=ft.Icons.DELETE_FOREVER_ROUNDED,
                 disabled=not armed,
                 on_click=lambda _: self._open_dialog(),
@@ -1240,7 +1240,7 @@ class SyncView(BaseView):
             title=ft.Row(
                 [
                     widgets.IconBadge(ft.Icons.WARNING_AMBER_ROUNDED, "danger", size=36, icon_size=18),
-                    ft.Text("Reset collections?", size=16, weight=ft.FontWeight.W_700, color=p.text),
+                    ft.Text("Reset library?", size=16, weight=ft.FontWeight.W_700, color=p.text),
                 ],
                 spacing=Space.MD,
             ),
@@ -1270,4 +1270,4 @@ class SyncView(BaseView):
         self.page.close(dialog)
         # TODO: wire to FileConverterService.start_convert_files() then
         # TextEmbedderService.reset_collection() + embed_collection()
-        self.not_implemented("Reset collections")
+        self.not_implemented("Reset library")

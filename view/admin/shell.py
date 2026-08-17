@@ -7,15 +7,15 @@ import flet as ft
 
 from view import theme
 from view import widgets
-from view.admin.screens.collections_view import CollectionsView
+from view.admin.screens.library_sync_view import LibrarySyncView
+from view.admin.screens.library_view import LibraryView
 from view.admin.screens.settings_view import SettingsView
-from view.admin.screens.sync_view import SyncView
 from view.theme import Radius, Space, palette
 
 # text, icon, selected icon, BaseView subclass
 NAV_ITEMS = [
-    ("Collections", ft.Icons.TABLE_ROWS_OUTLINED, ft.Icons.TABLE_ROWS_ROUNDED, CollectionsView),
-    ("Sync & Reset", ft.Icons.SYNC_OUTLINED, ft.Icons.SYNC_ROUNDED, SyncView),
+    ("Library", ft.Icons.TABLE_ROWS_OUTLINED, ft.Icons.TABLE_ROWS_ROUNDED, LibraryView),
+    ("Library Sync", ft.Icons.SYNC_OUTLINED, ft.Icons.SYNC_ROUNDED, LibrarySyncView),
     ("Settings", ft.Icons.TUNE_OUTLINED, ft.Icons.TUNE_ROUNDED, SettingsView),
 ]
 
@@ -26,8 +26,8 @@ class AdminPortal:
         self.page = page
         self.index = 0
         self.state = {
-            "collections_page": 1,
-            "collections_filter": "",
+            "library_page": 1,
+            "library_filter": "",
             "page_size": 10,
             "sync_mode": "sync",     # sync | reset
             # idle -> scanning -> reviewing -> updating -> done
