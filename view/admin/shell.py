@@ -5,7 +5,6 @@ Presentation only - none of the actions call into the services yet.
 
 import flet as ft
 
-from view import portal_rail
 from view import theme
 from view import widgets
 from view.admin.screens.collections_view import CollectionsView
@@ -78,7 +77,7 @@ class AdminPortal:
         self._body = ft.Container(content=self._view(), expand=True)
         self.page.add(
             ft.Row(
-                [portal_rail.build(self.page, "admin"), self._sidebar(), self._content()],
+                [widgets.PortalRail(self.page, "admin"), self._sidebar(), self._content()],
                 spacing=0,
                 expand=True,
                 vertical_alignment=ft.CrossAxisAlignment.STRETCH,

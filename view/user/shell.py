@@ -6,7 +6,6 @@ Presentation only - no query ever reaches TextEmbedderService yet.
 import flet as ft
 
 from view import mock_data as data
-from view import portal_rail
 from view import theme
 from view import widgets
 from view.theme import Space, palette
@@ -43,7 +42,7 @@ class UserPortal:
         self.page.add(
             ft.Row(
                 [
-                    portal_rail.build(self.page, "user"),
+                    widgets.PortalRail(self.page, "user"),
                     self._history,
                     self._body,
                 ],
