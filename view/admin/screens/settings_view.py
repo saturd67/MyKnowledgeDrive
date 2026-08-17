@@ -20,7 +20,7 @@ from constant.settings import (
     PATHS_OUTPUT_DIR,
 )
 from services.SettingService import settingService
-from view import widgets as w
+from view import widgets
 from view.base_view import BaseView
 from view.theme import Radius, Space
 
@@ -48,11 +48,11 @@ class SettingsView(BaseView):
 
         return ft.Column(
             [
-                w.PageHeader(
+                widgets.PageHeader(
                     "Settings",
                     "Stored in the setting table. Saving writes straight to the database.",
                     actions=[
-                        w.GhostButton(
+                        widgets.GhostButton(
                             "Open config folder",
                             icon=ft.Icons.FOLDER_OPEN_ROUNDED,
                             on_click=lambda _: self.not_implemented("Open config folder"),
@@ -144,7 +144,7 @@ class SettingsView(BaseView):
     # --- rows ----------------------------------------------------------------
 
     def _copy(self, what):
-        return w.IconButton(
+        return widgets.IconButton(
             ft.Icons.CONTENT_COPY_ROUNDED,
             f"Copy {what}",
             lambda _: self.not_implemented(f"Copy {what}"),
@@ -156,7 +156,7 @@ class SettingsView(BaseView):
             # drop focus out of the field.
             self.state["settings_edits"][key] = e.control.value
 
-        return w.EditableRow(
+        return widgets.EditableRow(
             LABELS[key],
             values[key],
             is_mono=True,
@@ -168,9 +168,9 @@ class SettingsView(BaseView):
         return ft.Row(
             [
                 ft.Container(expand=True),
-                w.GhostButton("Revert", icon=ft.Icons.UNDO_ROUNDED, dense=True,
+                widgets.GhostButton("Revert", icon=ft.Icons.UNDO_ROUNDED, dense=True,
                                on_click=lambda _: self._revert(keys, what)),
-                w.PrimaryButton("Save", icon=ft.Icons.CHECK_ROUNDED, dense=True,
+                widgets.PrimaryButton("Save", icon=ft.Icons.CHECK_ROUNDED, dense=True,
                                  on_click=lambda _: self._save(keys, what)),
             ],
             spacing=Space.SM,
@@ -195,28 +195,28 @@ class SettingsView(BaseView):
     # --- sections ------------------------------------------------------------
 
     def _paths(self, values):
-        rows = [w.KvRow("Base directory", BASE_DIR, is_mono=True,
+        rows = [widgets.KvRow("Base directory", BASE_DIR, is_mono=True,
                          trailing=self._copy("base directory"))]
         rows += [self._edit_row(key, values) for key in PATH_KEYS]
         rows += [
             self._note("Stored relative to the base directory, so the database survives "
                        "moving the project folder. An absolute path is used as-is."),
-            w.Divider(bottom=Space.SM),
+            widgets.Divider(bottom=Space.SM),
             self._form_actions(PATH_KEYS, "paths"),
         ]
-        return w.Section("Paths", "Where the pipeline reads and writes.",
+        return widgets.Section("Paths", "Where the pipeline reads and writes.",
                          content=ft.Column(rows, spacing=Space.MD))
 
     def _drive(self, values):
-        return w.Section(
+        return widgets.Section(
             "Google Drive",
             "Used by services/FileFetcherService.py.",
-            trailing=w.Pill("Read-only scope", "success", ft.Icons.CLOUD_DONE_ROUNDED),
+            trailing=widgets.Pill("Read-only scope", "success", ft.Icons.CLOUD_DONE_ROUNDED),
             content=ft.Column(
                 [
                     self._edit_row(DRIVE_FOLDER_ID, values),
                     self._edit_row(DRIVE_SERVICE_ACCOUNT_FILE, values),
-                    w.KvRow("Scope", values[DRIVE_SCOPE], is_mono=True),
+                    widgets.KvRow("Scope", values[DRIVE_SCOPE], is_mono=True),
                     self._note("Only file metadata is read - ids, names and modifiedTime. "
                                "File content still comes from the local mirror."),
                     self._form_actions(DRIVE_KEYS, "Drive settings"),
@@ -226,18 +226,18 @@ class SettingsView(BaseView):
         )
 
     def _embedding(self, values):
-        return w.Section(
+        return widgets.Section(
             "Embedding",
             "Used by services/TextEmbedderService.py.",
             content=ft.Column(
                 [
-                    w.KvRow("Model", values[EMBEDDING_MODEL], is_mono=True,
+                    widgets.KvRow("Model", values[EMBEDDING_MODEL], is_mono=True,
                              trailing=self._copy("model name")),
-                    w.KvRow("Collection", values[EMBEDDING_COLLECTION], is_mono=True),
-                    w.KvRow("Store", settingService.get_path(PATHS_CHROMA_STORE), is_mono=True),
+                    widgets.KvRow("Collection", values[EMBEDDING_COLLECTION], is_mono=True),
+                    widgets.KvRow("Store", settingService.get_path(PATHS_CHROMA_STORE), is_mono=True),
                     self._edit_row(EMBEDDING_RESULTS_PER_QUERY, values),
-                    w.KvRow("Telemetry", "Disabled"),
-                    w.Divider(bottom=Space.SM),
+                    widgets.KvRow("Telemetry", "Disabled"),
+                    widgets.Divider(bottom=Space.SM),
                     self._form_actions(EMBEDDING_KEYS, "embedding settings"),
                 ],
                 spacing=Space.MD,

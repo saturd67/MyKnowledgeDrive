@@ -7,7 +7,7 @@ import flet as ft
 
 from view import portal_rail
 from view import theme
-from view import widgets as w
+from view import widgets
 from view.admin.screens.collections_view import CollectionsView
 from view.admin.screens.settings_view import SettingsView
 from view.admin.screens.sync_view import SyncView
@@ -98,7 +98,7 @@ class AdminPortal:
     # --- helpers available to the screens ------------------------------------
 
     def notify(self, message, tone_name="neutral"):
-        self.page.open(w.SnackBar(self.page, message, tone_name))
+        self.page.open(widgets.SnackBar(self.page, message, tone_name))
 
     def not_implemented(self, feature):
         # TODO: wire to the matching FileConverterService/TextEmbedderService call
@@ -132,7 +132,7 @@ class AdminPortal:
         return ft.Container(
             content=ft.Column(
                 [
-                    ft.Container(content=w.Brand(portal="Admin Portal"), padding=ft.padding.all(Space.LG)),
+                    ft.Container(content=widgets.Brand(portal="Admin Portal"), padding=ft.padding.all(Space.LG)),
                     ft.Container(height=1, bgcolor=p.border_soft),
                     ft.Container(
                         content=ft.Column(items, spacing=Space.XS),

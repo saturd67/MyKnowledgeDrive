@@ -8,7 +8,7 @@ import flet as ft
 from view import mock_data as data
 from view import portal_rail
 from view import theme
-from view import widgets as w
+from view import widgets
 from view.theme import Space, palette
 from view.user.screens.search_view import SearchView
 
@@ -63,7 +63,7 @@ class UserPortal:
     # --- helpers available to the screen -------------------------------------
 
     def notify(self, message, tone_name="neutral"):
-        self.page.open(w.SnackBar(self.page, message, tone_name))
+        self.page.open(widgets.SnackBar(self.page, message, tone_name))
 
     def not_implemented(self, feature):
         # TODO: wire to TextEmbedderService.query(), then open
@@ -98,8 +98,8 @@ class UserPortal:
         header = ft.Container(
             content=ft.Row(
                 [
-                    ft.Container(content=w.Label("Search history"), expand=True),
-                    w.IconButton(
+                    ft.Container(content=widgets.Label("Search history"), expand=True),
+                    widgets.IconButton(
                         ft.Icons.DELETE_SWEEP_ROUNDED,
                         "Clear history",
                         lambda _: self.not_implemented("Clear search history"),
@@ -119,7 +119,7 @@ class UserPortal:
             )
         else:
             history = ft.Container(
-                content=w.EmptyState(
+                content=widgets.EmptyState(
                     ft.Icons.HISTORY_ROUNDED,
                     "No searches yet",
                     "Queries you run will be listed here.",
@@ -130,7 +130,7 @@ class UserPortal:
 
         return ft.Column(
             [
-                ft.Container(content=w.Brand(portal="User Portal"), padding=ft.padding.all(Space.LG)),
+                ft.Container(content=widgets.Brand(portal="User Portal"), padding=ft.padding.all(Space.LG)),
                 ft.Container(height=1, bgcolor=p.border_soft),
                 header,
                 history,
@@ -143,7 +143,7 @@ class UserPortal:
         p = palette()
         active = self.state["mode"] != "hero" and self.state["query"] == query
 
-        return w.Hoverable(
+        return widgets.Hoverable(
             ft.Row(
                 [
                     ft.Column(

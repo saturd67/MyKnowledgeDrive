@@ -18,7 +18,7 @@ import flet as ft
 from constant.settings import EMBEDDING_COLLECTION, EMBEDDING_MODEL
 from services.SettingService import settingService
 from view import mock_data as data
-from view import widgets as w
+from view import widgets
 from view.base_view import BaseView
 from view.theme import Radius, Space, tone
 
@@ -134,7 +134,7 @@ class SyncView(BaseView):
         }[mode]
 
         children = [
-            w.PageHeader(heading, description, actions=[self._run_button(mode, stage)]),
+            widgets.PageHeader(heading, description, actions=[self._run_button(mode, stage)]),
             ft.Container(height=Space.LG),
             self._mode_switch(),
             ft.Container(height=Space.XL),
@@ -264,7 +264,7 @@ class SyncView(BaseView):
         p = self.p
 
         if stage in ("scanning", "updating"):
-            return w.GhostButton(
+            return widgets.GhostButton(
                 "Cancel",
                 icon=ft.Icons.STOP_ROUNDED,
                 tone_name="danger",
@@ -288,14 +288,14 @@ class SyncView(BaseView):
             )
 
         if stage == "idle":
-            return w.PrimaryButton(
+            return widgets.PrimaryButton(
                 "Scan for changes",
                 icon=ft.Icons.MANAGE_SEARCH_ROUNDED,
                 on_click=lambda _: self._scan(),
             )
 
         if stage == "done":
-            return w.PrimaryButton(
+            return widgets.PrimaryButton(
                 "Scan again",
                 icon=ft.Icons.REFRESH_ROUNDED,
                 on_click=lambda _: self._scan(),
@@ -362,7 +362,7 @@ class SyncView(BaseView):
                             spacing=1,
                             expand=True,
                         ),
-                        w.Pill(
+                        widgets.Pill(
                             "done" if index < active_index else
                             ("running" if index == active_index else "pending"),
                             tone_name,
@@ -375,17 +375,17 @@ class SyncView(BaseView):
 
         if progress:
             caption, fraction = progress
-            bar = w.ProgressRow(caption, fraction, accent)
+            bar = widgets.ProgressRow(caption, fraction, accent)
         elif stage == "done":
-            bar = w.ProgressRow("Completed", 1.0, "success")
+            bar = widgets.ProgressRow("Completed", 1.0, "success")
         else:
-            bar = w.ProgressRow("Waiting to start", 0.0, "neutral")
+            bar = widgets.ProgressRow("Waiting to start", 0.0, "neutral")
 
-        return w.Section(
+        return widgets.Section(
             heading,
             description,
             trailing=self._status_pill(stage, accent),
-            content=ft.Column([ft.Column(rows, spacing=Space.LG), w.Divider(), bar], spacing=0),
+            content=ft.Column([ft.Column(rows, spacing=Space.LG), widgets.Divider(), bar], spacing=0),
         )
 
     @staticmethod
@@ -398,7 +398,7 @@ class SyncView(BaseView):
             "done": ("Completed", "success", ft.Icons.CHECK_CIRCLE_ROUNDED),
         }
         text, tone_name, icon = mapping[stage]
-        return w.Pill(text, tone_name, icon)
+        return widgets.Pill(text, tone_name, icon)
 
     def _console(self, mode):
         if mode == "reset":
@@ -407,19 +407,19 @@ class SyncView(BaseView):
             lines = self.state["sync_log"]
 
         content = (
-            w.LogConsole(lines)
+            widgets.LogConsole(lines)
             if lines
-            else w.EmptyState(
+            else widgets.EmptyState(
                 ft.Icons.TERMINAL_ROUNDED,
                 "Log is empty",
                 "Output from the converter and the embedder will stream here.",
                 height=200,
             )
         )
-        return w.Section(
+        return widgets.Section(
             "Run log",
             "Mirrors what the services log while a run is in progress.",
-            trailing=w.IconButton(ft.Icons.CONTENT_COPY_ROUNDED, "Copy log"),
+            trailing=widgets.IconButton(ft.Icons.CONTENT_COPY_ROUNDED, "Copy log"),
             content=content,
         )
 
@@ -440,12 +440,12 @@ class SyncView(BaseView):
 
     def _scan_strip(self):
         stats = self.state["scan_stats"] or {}
-        return w.Card(
+        return widgets.Card(
             ft.Row(
                 [
-                    ft.Container(content=w.KvRow("Scanned at", stats.get("scanned_at", "-")), expand=True),
-                    ft.Container(content=w.KvRow("Files walked", stats.get("walked", "-")), expand=True),
-                    ft.Container(content=w.KvRow("Duration", stats.get("duration", "-")), expand=True),
+                    ft.Container(content=widgets.KvRow("Scanned at", stats.get("scanned_at", "-")), expand=True),
+                    ft.Container(content=widgets.KvRow("Files walked", stats.get("walked", "-")), expand=True),
+                    ft.Container(content=widgets.KvRow("Duration", stats.get("duration", "-")), expand=True),
                 ],
                 spacing=Space.LG,
             ),
@@ -475,16 +475,16 @@ class SyncView(BaseView):
             ]
 
         return ft.Row(
-            [w.StatCard(icon, caption, value, None, tone_name) for icon, caption, value, tone_name in tiles],
+            [widgets.StatCard(icon, caption, value, None, tone_name) for icon, caption, value, tone_name in tiles],
             spacing=Space.LG,
         )
 
     def _results(self):
         changes = self.state["scan_changes"]
         if not changes:
-            return w.Section(
+            return widgets.Section(
                 "Changes",
-                content=w.EmptyState(
+                content=widgets.EmptyState(
                     ft.Icons.RULE_ROUNDED,
                     "Nothing to review",
                     "The scan found no files. Check the input directory in Settings.",
@@ -503,7 +503,7 @@ class SyncView(BaseView):
                                       tone_name, tickable, allow_all, rows))
 
         if not blocks:
-            body = w.EmptyState(
+            body = widgets.EmptyState(
                 ft.Icons.SEARCH_OFF_ROUNDED,
                 "Nothing matches that filter",
                 "Try a shorter path fragment, or switch the status filter back to all.",
@@ -511,7 +511,7 @@ class SyncView(BaseView):
         else:
             body = ft.Column(blocks, spacing=Space.LG)
 
-        return w.Section(
+        return widgets.Section(
             "Changes",
             f"{len(changes)} files scanned, grouped by what needs doing and nested by folder.",
             trailing=self._toolbar(),
@@ -589,13 +589,13 @@ class SyncView(BaseView):
         controls = [
             search,
             status,
-            w.IconButton(ft.Icons.UNFOLD_MORE_ROUNDED, "Expand all folders", set_folders(True)),
-            w.IconButton(ft.Icons.UNFOLD_LESS_ROUNDED, "Collapse all folders", set_folders(False)),
+            widgets.IconButton(ft.Icons.UNFOLD_MORE_ROUNDED, "Expand all folders", set_folders(True)),
+            widgets.IconButton(ft.Icons.UNFOLD_LESS_ROUNDED, "Collapse all folders", set_folders(False)),
         ]
         if not read_only:
             controls += [
-                w.GhostButton("Select all", on_click=select_all, dense=True),
-                w.GhostButton("Clear", on_click=clear, dense=True),
+                widgets.GhostButton("Select all", on_click=select_all, dense=True),
+                widgets.GhostButton("Clear", on_click=clear, dense=True),
             ]
         return ft.Row(controls, spacing=Space.SM)
 
@@ -631,7 +631,7 @@ class SyncView(BaseView):
             [
                 caret,
                 ft.Text(heading, size=13, weight=ft.FontWeight.W_700, color=p.text),
-                w.Pill(str(len(rows)), tone_name),
+                widgets.Pill(str(len(rows)), tone_name),
                 ft.Text(description, size=11, color=p.text_muted, expand=True,
                         overflow=ft.TextOverflow.ELLIPSIS),
                 counter,
@@ -641,7 +641,7 @@ class SyncView(BaseView):
         )
 
         if tickable and allow_all and not read_only:
-            header_content = w.CheckRow(
+            header_content = widgets.CheckRow(
                 None if 0 < ticked < len(rows) else ticked == len(rows),
                 ft.Container(content=title, on_click=toggle_open, expand=True),
                 on_change=toggle_all,
@@ -649,7 +649,7 @@ class SyncView(BaseView):
             )
             self._refs[f"group_{group_key}"] = header_content.box
         else:
-            header_content = w.CheckSpacer(ft.Container(content=title, on_click=toggle_open, expand=True))
+            header_content = widgets.CheckSpacer(ft.Container(content=title, on_click=toggle_open, expand=True))
 
         header = ft.Container(
             content=header_content,
@@ -802,7 +802,7 @@ class SyncView(BaseView):
         )
 
         if tickable:
-            row = w.CheckRow(
+            row = widgets.CheckRow(
                 None if 0 < ticked < len(keys) else ticked == len(keys),
                 content,
                 on_change=toggle_tick,
@@ -810,7 +810,7 @@ class SyncView(BaseView):
             )
             self._refs.setdefault("nodes", []).append((group_key, row.box, keys))
         else:
-            row = w.CheckSpacer(content)
+            row = widgets.CheckSpacer(content)
 
         return ft.Container(
             content=row,
@@ -852,8 +852,8 @@ class SyncView(BaseView):
             self.refresh()
 
         return ft.Container(
-            content=w.GhostButton(f"Show {remaining} more", on_click=handler, dense=True),
-            padding=ft.padding.only(left=w.CHECK_WIDTH + Space.MD, top=Space.SM),
+            content=widgets.GhostButton(f"Show {remaining} more", on_click=handler, dense=True),
+            padding=ft.padding.only(left=widgets.CHECK_WIDTH + Space.MD, top=Space.SM),
         )
 
     def _change_row(self, group_key, change, tickable, depth=0):
@@ -878,7 +878,7 @@ class SyncView(BaseView):
 
         content = ft.Row(
             [
-                w.FileIcon(change["kind"], size=28),
+                widgets.FileIcon(change["kind"], size=28),
                 ft.Text(name, size=13, weight=ft.FontWeight.W_600, color=p.text,
                         overflow=ft.TextOverflow.ELLIPSIS, expand=True),
                 ft.Container(
@@ -887,19 +887,19 @@ class SyncView(BaseView):
                     width=250,
                 ),
                 ft.Container(
-                    content=w.Pill("reconvert", "neutral") if change["needs_conversion"] else None,
+                    content=widgets.Pill("reconvert", "neutral") if change["needs_conversion"] else None,
                     width=88,
                 ),
-                ft.Container(content=w.Pill(label, tone_name), width=120),
+                ft.Container(content=widgets.Pill(label, tone_name), width=120),
             ],
             spacing=Space.MD,
             vertical_alignment=ft.CrossAxisAlignment.CENTER,
         )
 
         row = (
-            w.CheckRow(selected, content, on_change=on_toggle)
+            widgets.CheckRow(selected, content, on_change=on_toggle)
             if tickable
-            else w.CheckSpacer(content)
+            else widgets.CheckSpacer(content)
         )
 
         def on_hover(e):
@@ -970,10 +970,10 @@ class SyncView(BaseView):
         stage = self.state["sync_stage"]
 
         if stage == "idle":
-            return w.Section(
+            return widgets.Section(
                 "Last run summary",
                 "Result of the previous run.",
-                content=w.EmptyState(
+                content=widgets.EmptyState(
                     ft.Icons.HISTORY_ROUNDED,
                     "No run in this session",
                     "Scan to see which files are new, changed or gone from Drive.",
@@ -982,32 +982,32 @@ class SyncView(BaseView):
             )
 
         if stage == "scanning":
-            return w.Section(
+            return widgets.Section(
                 "Scanning",
                 "Nothing is written while a scan runs.",
                 content=ft.Column(
                     [
-                        w.KvRow("Input", "resources\\files"),
-                        w.KvRow("Collection", settingService.get(EMBEDDING_COLLECTION), is_mono=True),
-                        w.Divider(bottom=Space.MD),
-                        w.KvRow("Reads", "source mtimes, Drive listing, collection metadata"),
-                        w.KvRow("Writes", "nothing"),
+                        widgets.KvRow("Input", "resources\\files"),
+                        widgets.KvRow("Collection", settingService.get(EMBEDDING_COLLECTION), is_mono=True),
+                        widgets.Divider(bottom=Space.MD),
+                        widgets.KvRow("Reads", "source mtimes, Drive listing, collection metadata"),
+                        widgets.KvRow("Writes", "nothing"),
                     ],
                     spacing=Space.MD,
                 ),
             )
 
         selected = len(self.state["scan_selected"])
-        return w.Section(
+        return widgets.Section(
             "This run",
             "Only the ticked files are touched.",
             content=ft.Column(
                 [
-                    w.KvRow("Selected", str(selected)),
-                    w.KvRow("Collection", settingService.get(EMBEDDING_COLLECTION), is_mono=True),
-                    w.KvRow("Embedding model", settingService.get(EMBEDDING_MODEL), is_mono=True),
-                    w.Divider(bottom=Space.MD),
-                    w.KvRow("Cancel", "Stops after the current file"),
+                    widgets.KvRow("Selected", str(selected)),
+                    widgets.KvRow("Collection", settingService.get(EMBEDDING_COLLECTION), is_mono=True),
+                    widgets.KvRow("Embedding model", settingService.get(EMBEDDING_MODEL), is_mono=True),
+                    widgets.Divider(bottom=Space.MD),
+                    widgets.KvRow("Cancel", "Stops after the current file"),
                 ],
                 spacing=Space.MD,
             ),
@@ -1156,7 +1156,7 @@ class SyncView(BaseView):
                 rows.append(
                     ft.Row(
                         [
-                            w.IconBadge(icon, tone_name, size=34, icon_size=16),
+                            widgets.IconBadge(icon, tone_name, size=34, icon_size=16),
                             ft.Column(
                                 [
                                     ft.Text(name, size=13, weight=ft.FontWeight.W_600, color=p.text),
@@ -1170,9 +1170,9 @@ class SyncView(BaseView):
                         vertical_alignment=ft.CrossAxisAlignment.CENTER,
                     )
                 )
-            return ft.Column([w.Label(heading)] + rows, spacing=Space.MD)
+            return ft.Column([widgets.Label(heading)] + rows, spacing=Space.MD)
 
-        return w.Section(
+        return widgets.Section(
             "What a reset touches",
             content=ft.Row(
                 [
@@ -1211,20 +1211,20 @@ class SyncView(BaseView):
             on_change=on_change,
         )
 
-        return w.Section(
+        return widgets.Section(
             "Confirm reset",
             f"Type {CONFIRM_WORD} to unlock the run button.",
-            trailing=w.Pill("Armed" if armed else "Locked",
+            trailing=widgets.Pill("Armed" if armed else "Locked",
                             "danger" if armed else "neutral",
                             ft.Icons.LOCK_OPEN_ROUNDED if armed else ft.Icons.LOCK_OUTLINE_ROUNDED),
             content=ft.Column(
                 [
                     field,
-                    w.Divider(bottom=Space.MD),
-                    w.KvRow("Files to convert", data.STATS["source_files"]),
-                    w.KvRow("Estimated duration", "~5 min"),
-                    w.KvRow("Embedding model", settingService.get(EMBEDDING_MODEL), is_mono=True),
-                    w.KvRow("Last reset", "6 days ago"),
+                    widgets.Divider(bottom=Space.MD),
+                    widgets.KvRow("Files to convert", data.STATS["source_files"]),
+                    widgets.KvRow("Estimated duration", "~5 min"),
+                    widgets.KvRow("Embedding model", settingService.get(EMBEDDING_MODEL), is_mono=True),
+                    widgets.KvRow("Last reset", "6 days ago"),
                 ],
                 spacing=Space.MD,
             ),
@@ -1239,7 +1239,7 @@ class SyncView(BaseView):
             shape=ft.RoundedRectangleBorder(radius=Radius.LG),
             title=ft.Row(
                 [
-                    w.IconBadge(ft.Icons.WARNING_AMBER_ROUNDED, "danger", size=36, icon_size=18),
+                    widgets.IconBadge(ft.Icons.WARNING_AMBER_ROUNDED, "danger", size=36, icon_size=18),
                     ft.Text("Reset collections?", size=16, weight=ft.FontWeight.W_700, color=p.text),
                 ],
                 spacing=Space.MD,
@@ -1255,8 +1255,8 @@ class SyncView(BaseView):
                 width=360,
             ),
             actions=[
-                w.GhostButton("Cancel", on_click=lambda _: self.page.close(dialog)),
-                w.PrimaryButton(
+                widgets.GhostButton("Cancel", on_click=lambda _: self.page.close(dialog)),
+                widgets.PrimaryButton(
                     "Yes, reset",
                     tone_name="danger",
                     on_click=lambda _: self._confirmed(dialog),

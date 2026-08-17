@@ -3,7 +3,7 @@
 import flet as ft
 
 from view import mock_data as data
-from view import widgets as w
+from view import widgets
 from view.base_view import BaseView
 from view.protocols.portal import SearchPortal
 from view.theme import Radius, Space, tone
@@ -125,11 +125,11 @@ class SearchView(BaseView):
 
         if self.state["query"]:
             controls.append(
-                w.IconButton(ft.Icons.CLOSE_ROUNDED, "Clear", lambda _: self.portal.clear())
+                widgets.IconButton(ft.Icons.CLOSE_ROUNDED, "Clear", lambda _: self.portal.clear())
             )
 
         controls.append(
-            w.PrimaryButton(
+            widgets.PrimaryButton(
                 "Search",
                 icon=ft.Icons.ARROW_FORWARD_ROUNDED,
                 on_click=lambda _: self.portal.search(field.value),
@@ -156,10 +156,10 @@ class SearchView(BaseView):
             count = ft.ProgressRing(width=16, height=16, stroke_width=2, color=p.primary)
         elif mode == "empty":
             caption = f'No matches for "{query}"'
-            count = w.Pill("0 results", "warning")
+            count = widgets.Pill("0 results", "warning")
         else:
             caption = f'Top matches for "{query}"'
-            count = w.Pill(f"{len(data.SEARCH_RESULTS)} results", "success")
+            count = widgets.Pill(f"{len(data.SEARCH_RESULTS)} results", "success")
 
         return ft.Row(
             [
@@ -182,12 +182,12 @@ class SearchView(BaseView):
             return ft.Column([self._skeleton() for _ in range(4)], spacing=Space.MD)
 
         if mode == "empty":
-            return w.Card(
-                w.EmptyState(
+            return widgets.Card(
+                widgets.EmptyState(
                     ft.Icons.SEARCH_OFF_ROUNDED,
                     "Nothing close enough",
                     "Try different wording, or run a sync in the admin portal if the note is new.",
-                    action=w.GhostButton("Start over", icon=ft.Icons.REFRESH_ROUNDED,
+                    action=widgets.GhostButton("Start over", icon=ft.Icons.REFRESH_ROUNDED,
                                           on_click=lambda _: self.portal.clear()),
                     height=320,
                 )
@@ -209,7 +209,7 @@ class SearchView(BaseView):
             self.state["selected"] = index
             self.refresh()
 
-        return w.Hoverable(
+        return widgets.Hoverable(
             ft.Row(
                 [
                     ft.Container(
@@ -217,7 +217,7 @@ class SearchView(BaseView):
                                         color=p.primary if selected else p.text_faint),
                         width=20,
                     ),
-                    w.FileIcon(result["kind"], size=40),
+                    widgets.FileIcon(result["kind"], size=40),
                     ft.Column(
                         [
                             ft.Text(name, size=14, weight=ft.FontWeight.W_600, color=p.text,
@@ -270,7 +270,7 @@ class SearchView(BaseView):
         relevance = ft.Container(
             content=ft.Column(
                 [
-                    w.Label("Relevance"),
+                    widgets.Label("Relevance"),
                     ft.Row(
                         [
                             ft.Container(
@@ -296,8 +296,8 @@ class SearchView(BaseView):
                 [
                     ft.Row(
                         [
-                            w.Label("Drive id"),
-                            w.Mono(result["id"], size=11, color=p.text, max_lines=1,
+                            widgets.Label("Drive id"),
+                            widgets.Mono(result["id"], size=11, color=p.text, max_lines=1,
                                    overflow=ft.TextOverflow.ELLIPSIS, expand=True),
                         ],
                         spacing=Space.SM,
@@ -313,9 +313,9 @@ class SearchView(BaseView):
 
         actions = ft.Row(
             [
-                w.IconButton(ft.Icons.LINK_ROUNDED, "Copy Drive link",
+                widgets.IconButton(ft.Icons.LINK_ROUNDED, "Copy Drive link",
                               lambda _: self.not_implemented("Copy Drive link")),
-                w.PrimaryButton(
+                widgets.PrimaryButton(
                     "Open in Google Drive",
                     icon=ft.Icons.OPEN_IN_NEW_ROUNDED,
                     dense=True,
@@ -325,7 +325,7 @@ class SearchView(BaseView):
             spacing=Space.XS,
         )
 
-        return w.Card(
+        return widgets.Card(
             ft.Row(
                 [
                     relevance,
@@ -347,7 +347,7 @@ class SearchView(BaseView):
         def bar(width, height=12):
             return ft.Container(width=width, height=height, bgcolor=p.surface_high, border_radius=Radius.SM)
 
-        return w.Card(
+        return widgets.Card(
             ft.Row(
                 [
                     ft.Container(width=40, height=40, bgcolor=p.surface_high, border_radius=Radius.MD),

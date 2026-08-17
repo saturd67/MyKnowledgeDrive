@@ -3,8 +3,8 @@
 Each widget is a Flet control subclass, so it is used where a control is
 expected - no build step:
 
-    w.Section("Paths", "Where the pipeline reads and writes.",
-              content=ft.Column([w.KvRow("Base directory", BASE_DIR)]))
+    widgets.Section("Paths", "Where the pipeline reads and writes.",
+                    content=ft.Column([widgets.KvRow("Base directory", BASE_DIR)]))
 
 Widgets read the palette at construction time, which is why a screen is
 rebuilt rather than mutated when the theme changes.
