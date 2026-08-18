@@ -25,7 +25,7 @@ from view.widgets.blocks import (
     PortalRail,
     StatCard,
 )
-from view.widgets.buttons import GhostButton, IconButton, PrimaryButton
+from view.widgets.buttons import GhostButton, IconButton, PrimaryButton, PrimaryIconButton
 from view.widgets.containers import Card, Divider, IconBadge, Pill, Section
 from view.widgets.feedback import (
     LOG_LEVEL_COLORS,
@@ -44,7 +44,7 @@ __all__ = [
     # containers
     "Card", "Section", "IconBadge", "Pill", "Divider",
     # buttons
-    "PrimaryButton", "GhostButton", "IconButton",
+    "PrimaryButton", "PrimaryIconButton", "GhostButton", "IconButton",
     # feedback
     "SnackBar", "EmptyState", "ProgressRow", "LogLine", "LogConsole",
     # composite blocks

@@ -1,14 +1,13 @@
-"""User portal shell: a top bar plus the search screen.
+"""User portal shell: a rail, the search sidebar and the reading pane.
 
 Presentation only - no query ever reaches TextEmbedderService yet.
 """
 
 import flet as ft
 
-from view import mock_data as data
 from view import theme
 from view import widgets
-from view.theme import Space, palette
+from view.theme import palette
 from view.user.screens.search_view import SearchView
 
 
@@ -20,9 +19,10 @@ class UserPortal:
             "query": "",
             "mode": "hero",      # hero | searching | results | empty
             "selected": 0,
+            "details": True,     # the file bar under the reading pane
         }
         self._body = ft.Container(expand=True)
-        self._history = ft.Container()
+        self._panel = ft.Container()
 
     # --- lifecycle ----------------------------------------------------------
 
@@ -37,13 +37,22 @@ class UserPortal:
     def render(self):
         theme.apply(self.page)
         self.page.controls.clear()
-        self._body = ft.Container(content=SearchView(self).build(), expand=True)
-        self._history = self._sidebar()
+
+        p = palette()
+        view = SearchView(self)
+        self._panel = ft.Container(
+            content=view.build_panel(),
+            width=SearchView.PANEL_WIDTH,
+            bgcolor=p.sidebar,
+            border=ft.border.only(right=ft.BorderSide(1, p.border)),
+        )
+        self._body = ft.Container(content=view.build(), expand=True)
+
         self.page.add(
             ft.Row(
                 [
                     widgets.PortalRail(self.page, "user"),
-                    self._history,
+                    self._panel,
                     self._body,
                 ],
                 spacing=0,
@@ -54,10 +63,12 @@ class UserPortal:
         self.page.update()
 
     def refresh(self):
-        self._body.content = SearchView(self).build()
+        """Both panes are rebuilt together - picking a hit changes each of them."""
+        view = SearchView(self)
+        self._panel.content = view.build_panel()
+        self._panel.update()
+        self._body.content = view.build()
         self._body.update()
-        self._history.content = self._sidebar_content()
-        self._history.update()
 
     # --- helpers available to the screen -------------------------------------
 
@@ -79,93 +90,3 @@ class UserPortal:
         self.state["query"] = ""
         self.state["mode"] = "hero"
         self.refresh()
-
-    # --- layout --------------------------------------------------------------
-
-    def _sidebar(self):
-        p = palette()
-        return ft.Container(
-            content=self._sidebar_content(),
-            width=248,
-            bgcolor=p.sidebar,
-            border=ft.border.only(right=ft.BorderSide(1, p.border)),
-        )
-
-    def _sidebar_content(self):
-        p = palette()
-
-        header = ft.Container(
-            content=ft.Row(
-                [
-                    ft.Container(content=widgets.Label("Search history"), expand=True),
-                    widgets.IconButton(
-                        ft.Icons.DELETE_SWEEP_ROUNDED,
-                        "Clear history",
-                        lambda _: self.not_implemented("Clear search history"),
-                    ),
-                ],
-                vertical_alignment=ft.CrossAxisAlignment.CENTER,
-            ),
-            padding=ft.padding.only(left=Space.LG, right=Space.SM, top=Space.LG, bottom=Space.SM),
-        )
-
-        if data.SEARCH_HISTORY:
-            entries = [self._history_entry(q, when, hits) for q, when, hits in data.SEARCH_HISTORY]
-            history = ft.Container(
-                content=ft.Column(entries, spacing=Space.XS, scroll=ft.ScrollMode.AUTO),
-                padding=ft.padding.symmetric(horizontal=Space.MD),
-                expand=True,
-            )
-        else:
-            history = ft.Container(
-                content=widgets.EmptyState(
-                    ft.Icons.HISTORY_ROUNDED,
-                    "No searches yet",
-                    "Queries you run will be listed here.",
-                    height=200,
-                ),
-                expand=True,
-            )
-
-        return ft.Column(
-            [
-                ft.Container(content=widgets.Brand(portal="User Portal"), padding=ft.padding.all(Space.LG)),
-                ft.Container(height=1, bgcolor=p.border_soft),
-                header,
-                history,
-            ],
-            spacing=0,
-            expand=True,
-        )
-
-    def _history_entry(self, query, when, hits):
-        p = palette()
-        active = self.state["mode"] != "hero" and self.state["query"] == query
-
-        return widgets.Hoverable(
-            ft.Row(
-                [
-                    ft.Column(
-                        [
-                            ft.Text(
-                                query,
-                                size=12,
-                                weight=ft.FontWeight.W_600 if active else ft.FontWeight.W_500,
-                                color=p.text if active else p.text_muted,
-                                max_lines=2,
-                                overflow=ft.TextOverflow.ELLIPSIS,
-                            ),
-                            ft.Text(f"{hits} results - {when}", size=10, color=p.text_faint),
-                        ],
-                        spacing=1,
-                        expand=True,
-                    ),
-                ],
-                spacing=Space.SM,
-                vertical_alignment=ft.CrossAxisAlignment.START,
-            ),
-            padding=ft.padding.symmetric(horizontal=Space.MD, vertical=Space.SM),
-            on_click=lambda _, q=query: self.search(q),
-            selected=active,
-            bordered=False,
-        )

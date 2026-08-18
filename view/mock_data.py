@@ -107,16 +107,110 @@ SEARCH_RESULTS = [
     },
 ]
 
-SEARCH_HISTORY = [
-    ("ssh tunnel port forwarding", "2 min ago", 5),
-    ("spring boot annotations", "18 min ago", 5),
-    ("docker compose volumes", "1 hour ago", 5),
-    ("chroma persistent client", "Yesterday", 4),
-    ("nginx reverse proxy config", "Yesterday", 5),
-    ("pytesseract image to string", "2 days ago", 3),
-    ("quartz scheduler tables", "2 days ago", 5),
-    ("mammoth convert docx to html", "5 days ago", 2),
-]
+# Converted text of a result, as the reading pane shows it.
+#
+# One (block, text) tuple per paragraph, keyed by Drive id. A block is one of
+#
+#   h1 / h2   heading levels the converter keeps from the source document
+#   p         plain paragraph
+#   bullet    list item
+#   code      a command or snippet, rendered mono on a tinted strip
+#
+# Image notes carry the same blocks - their text is what OCR pulled out of the
+# screenshot, which is also what got embedded.
+FILE_CONTENT = {
+    # Linux\SSH & SFTP\SSH Tunnel
+    "4aB0kDsXz5YcMe2GaIrRf7LjUp3WtHvBr": [
+        ("h1", "SSH Tunnel"),
+        ("p", "A tunnel carries a TCP port over an existing SSH session, so a service that "
+              "only listens on localhost can still be reached from the other end."),
+        ("h2", "Local port forwarding"),
+        ("p", "Opens a port on my machine and forwards it to a host the server can see."),
+        ("code", "ssh -L 8080:localhost:80 user@host"),
+        ("bullet", "8080 is the port opened locally."),
+        ("bullet", "localhost:80 is resolved on the server, not here."),
+        ("bullet", "Add -N to forward only, without opening a shell."),
+        ("h2", "Reverse tunnel"),
+        ("p", "The opposite direction - exposes a local service on the remote side, which is "
+              "how a machine behind NAT is reached."),
+        ("code", "ssh -R 9000:localhost:3000 user@host"),
+        ("p", "GatewayPorts must be set to yes in sshd_config for the remote port to accept "
+              "anything other than loopback connections."),
+        ("h2", "Keeping it up"),
+        ("code", "ssh -NL 5432:db-internal:5432 user@host -o ServerAliveInterval=30"),
+        ("bullet", "ServerAliveInterval stops an idle tunnel from being dropped."),
+        ("bullet", "autossh restarts the tunnel when the link goes down."),
+    ],
+    # Linux\SSH & SFTP\SSH with Private Key
+    "5cD1lEtYa6ZdNf3HbJsSg8MkVq4XuIwCs": [
+        ("h1", "SSH with Private Key"),
+        ("p", "Key based login replaces the password prompt and is what every server ends up "
+              "using once password authentication is turned off."),
+        ("h2", "Generate the pair"),
+        ("code", "ssh-keygen -t ed25519 -C \"laptop\""),
+        ("bullet", "Private half stays in ~/.ssh/id_ed25519 and never leaves the machine."),
+        ("bullet", "Public half is the .pub file, safe to copy anywhere."),
+        ("h2", "Install the public key"),
+        ("code", "ssh-copy-id user@host"),
+        ("p", "Without ssh-copy-id, append the .pub contents to ~/.ssh/authorized_keys on the "
+              "server by hand."),
+        ("h2", "Permissions"),
+        ("p", "sshd refuses a key whose file is readable by anyone else."),
+        ("code", "chmod 700 ~/.ssh\nchmod 600 ~/.ssh/authorized_keys"),
+        ("h2", "Harden the server"),
+        ("bullet", "PasswordAuthentication no"),
+        ("bullet", "PermitRootLogin no"),
+        ("bullet", "Reload with systemctl reload sshd - keep the current session open until a "
+                   "second one logs in."),
+    ],
+    # Linux\Firewall
+    "6eF2mFuZb7AeOg4IcKtTh9NlWr5YvJxDt": [
+        ("h1", "Firewall"),
+        ("p", "firewalld notes for RHEL based boxes. Every rule belongs to a zone, and the "
+              "active zone is the one bound to the interface."),
+        ("h2", "Check first"),
+        ("code", "firewall-cmd --state\nfirewall-cmd --get-active-zones\nfirewall-cmd --list-all"),
+        ("h2", "Open a port"),
+        ("code", "firewall-cmd --add-port=22/tcp --permanent\nfirewall-cmd --reload"),
+        ("bullet", "Without --permanent the rule is gone after a reload."),
+        ("bullet", "--reload is what applies a permanent rule to the running config."),
+        ("h2", "Services instead of ports"),
+        ("code", "firewall-cmd --add-service=https --permanent"),
+        ("p", "Named services are easier to read later than a bare port number."),
+        ("h2", "Careful on a public interface"),
+        ("bullet", "Confirm the zone before opening anything - the public zone faces the "
+                   "internet."),
+        ("bullet", "--remove-port takes a rule back out with the same syntax."),
+    ],
+    # Linux\Linux Path Cheatsheet  (image, text from OCR)
+    "8iJ4oHwBd9CgQi6KeMvVj1PnYt7AxLzFv": [
+        ("h1", "Linux Path Cheatsheet"),
+        ("p", "Filesystem hierarchy, one line per top level directory."),
+        ("bullet", "/etc - configuration files for the system and installed packages."),
+        ("bullet", "/var - variable state: logs, spools, caches, databases."),
+        ("bullet", "/opt - optional add-on packages that ship their own tree."),
+        ("bullet", "/usr - read-only user programs and their shared data."),
+        ("bullet", "/home - one directory per user account."),
+        ("bullet", "/tmp - scratch space, cleared on boot."),
+        ("bullet", "/proc - kernel and process information, not real files."),
+        ("bullet", "/dev - device nodes."),
+        ("bullet", "/srv - data served by the machine, such as a web root."),
+        ("bullet", "/mnt - manual mount points."),
+    ],
+    # Networking\8 Popular Network Protocols  (image, text from OCR)
+    "0mN6qJyDf1EiSk8MgOxXl3RpAv9CzNbHx": [
+        ("h1", "8 Popular Network Protocols"),
+        ("p", "What each protocol is for and which OSI layer it sits on."),
+        ("bullet", "HTTP - web pages and APIs, application layer, port 80."),
+        ("bullet", "HTTPS - HTTP wrapped in TLS, port 443."),
+        ("bullet", "FTP - file transfer, separate control and data connections, ports 21 and 20."),
+        ("bullet", "SMTP - sending mail between servers, port 25."),
+        ("bullet", "SSH - encrypted remote shell and tunnels, port 22."),
+        ("bullet", "DNS - name to address lookups, mostly UDP, port 53."),
+        ("bullet", "DHCP - hands out addresses on a LAN, ports 67 and 68."),
+        ("bullet", "TCP - reliable ordered delivery, transport layer, underneath most of the above."),
+    ],
+}
 
 SYNC_SUMMARY = [
     ("Added", "6", "success"),
