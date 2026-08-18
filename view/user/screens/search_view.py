@@ -30,8 +30,17 @@ class SearchView(BaseView):
     #: widest thing in the sidebar.
     SEARCH_BUTTON = 32
 
+    #: Both panes open on a header - the brand in the sidebar, the file bar in
+    #: the reading pane - and they share this height so the rule under each of
+    #: them lands on the same line.
+    HEADER_HEIGHT = 60
+
     def build(self):
-        """Reading pane: the file behind the selected hit."""
+        """Reading pane: the file behind the selected hit.
+
+        Returned without a padding frame - the pane runs to the window edges,
+        so every branch below fills the space the shell gives it.
+        """
         mode = self.state["mode"]
 
         if mode == "results":
@@ -48,13 +57,7 @@ class SearchView(BaseView):
         else:
             content = self._hero()
 
-        return ft.Container(
-            content=content,
-            padding=ft.padding.only(
-                left=Space.MD, right=Space.MD, top=Space.MD, bottom=Space.MD
-            ),
-            expand=True,
-        )
+        return content
 
     # --- sidebar -------------------------------------------------------------
 
@@ -64,8 +67,15 @@ class SearchView(BaseView):
 
         return ft.Column(
             [
-                ft.Container(content=widgets.Brand(portal="User Portal"), padding=Space.MD),
-                ft.Container(height=1, bgcolor=p.border_soft),
+                # The rule is a border rather than a row of its own: inside the
+                # box it lands on the same line as the one under the file bar,
+                # which is drawn the same way and given the same height.
+                ft.Container(
+                    content=widgets.Brand(portal="User Portal"),
+                    height=self.HEADER_HEIGHT,
+                    padding=ft.padding.symmetric(horizontal=Space.MD),
+                    border=ft.border.only(bottom=ft.BorderSide(1, p.border)),
+                ),
                 self._search_block(),
                 ft.Container(height=1, bgcolor=p.border_soft),
                 self._results_header(),
@@ -311,25 +321,31 @@ class SearchView(BaseView):
                                            on_click=lambda _: self.portal.clear()),
                 height=360,
             ),
+            radius=0,
+            border=None,
             expand=True,
         )
 
     # --- reading pane --------------------------------------------------------
 
     def _file_pane(self, result):
-        """The text fills the pane; the file bar sits under it."""
+        """The file bar tops the pane; the text fills what is left.
+
+        Both run to the window edge, so the rule under the bar is the only
+        line between them - an outline round either would double the sidebar
+        border on the left and be clipped on the right.
+        """
         return ft.Column(
             [
-                self._file_body(result),
-                ft.Container(height=Space.SM),
                 self._file_header(result),
+                self._file_body(result),
             ],
             spacing=0,
             expand=True,
         )
 
     def _file_header(self, result):
-        """One bar under the text: what the file is, how it scored, Drive actions.
+        """One bar over the text: what the file is, how it scored, Drive actions.
 
         Collapses to just the name and the score, so the reading pane can have
         the whole height when the detail is not wanted.
@@ -344,13 +360,17 @@ class SearchView(BaseView):
             self.refresh()
 
         toggle_button = widgets.IconButton(
-            ft.Icons.KEYBOARD_ARROW_DOWN_ROUNDED if shown else ft.Icons.KEYBOARD_ARROW_UP_ROUNDED,
+            # The bar collapses upwards, so the chevron points the way it goes.
+            ft.Icons.KEYBOARD_ARROW_UP_ROUNDED if shown else ft.Icons.KEYBOARD_ARROW_DOWN_ROUNDED,
             "Hide file details" if shown else "Show file details",
             toggle,
         )
 
         percent = ft.Text(f"{int(score * 100)}%", size=12, weight=ft.FontWeight.W_700,
                           color=p.primary, tooltip=f"distance {result['distance']:.4f}")
+
+        # The one line that separates the bar from the text under it.
+        rule_below = ft.border.only(bottom=ft.BorderSide(1, p.border))
 
         if not shown:
             return widgets.Card(
@@ -365,6 +385,8 @@ class SearchView(BaseView):
                     spacing=Space.SM,
                     vertical_alignment=ft.CrossAxisAlignment.CENTER,
                 ),
+                radius=0,
+                border=rule_below,
                 padding=ft.padding.only(left=Space.MD, right=Space.XS),
             )
 
@@ -410,7 +432,10 @@ class SearchView(BaseView):
                 spacing=Space.SM,
                 vertical_alignment=ft.CrossAxisAlignment.CENTER,
             ),
-            padding=ft.padding.only(left=Space.MD, right=Space.XS, top=Space.XS, bottom=Space.XS),
+            radius=0,
+            border=rule_below,
+            height=self.HEADER_HEIGHT,
+            padding=ft.padding.only(left=Space.MD, right=Space.XS),
         )
 
     def _file_body(self, result):
@@ -456,6 +481,8 @@ class SearchView(BaseView):
                 spacing=0,
                 expand=True,
             ),
+            radius=0,
+            border=None,
             padding=Space.MD,
             expand=True,
         )
@@ -560,7 +587,10 @@ class SearchView(BaseView):
                 spacing=Space.SM,
                 vertical_alignment=ft.CrossAxisAlignment.CENTER,
             ),
-            padding=ft.padding.symmetric(horizontal=Space.MD, vertical=Space.SM),
+            radius=0,
+            border=ft.border.only(bottom=ft.BorderSide(1, p.border)),
+            height=self.HEADER_HEIGHT,
+            padding=ft.padding.symmetric(horizontal=Space.MD),
         )
 
         lines = []
@@ -569,10 +599,9 @@ class SearchView(BaseView):
 
         return ft.Column(
             [
-                widgets.Card(ft.Column(lines, spacing=0, expand=True), padding=Space.MD,
-                             expand=True),
-                ft.Container(height=Space.SM),
                 header,
+                widgets.Card(ft.Column(lines, spacing=0, expand=True), radius=0, border=None,
+                             padding=Space.MD, expand=True),
             ],
             spacing=0,
             expand=True,
