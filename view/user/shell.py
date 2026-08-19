@@ -19,7 +19,6 @@ class UserPortal:
             "query": "",
             "mode": "hero",      # hero | searching | results | empty
             "selected": 0,
-            "details": True,     # the file bar under the reading pane
         }
         self._body = ft.Container(expand=True)
         self._panel = ft.Container()

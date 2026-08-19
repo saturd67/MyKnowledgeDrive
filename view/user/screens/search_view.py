@@ -32,8 +32,9 @@ class SearchView(BaseView):
 
     #: Both panes open on a header - the brand in the sidebar, the file bar in
     #: the reading pane - and they share this height so the rule under each of
-    #: them lands on the same line.
-    HEADER_HEIGHT = 60
+    #: them lands on the same line. Taken from the brand block, which the admin
+    #: portal opens on too.
+    HEADER_HEIGHT = widgets.BrandHeader.HEIGHT
 
     def build(self):
         """Reading pane: the file behind the selected hit.
@@ -70,12 +71,7 @@ class SearchView(BaseView):
                 # The rule is a border rather than a row of its own: inside the
                 # box it lands on the same line as the one under the file bar,
                 # which is drawn the same way and given the same height.
-                ft.Container(
-                    content=widgets.Brand(portal="User Portal"),
-                    height=self.HEADER_HEIGHT,
-                    padding=ft.padding.symmetric(horizontal=Space.MD),
-                    border=ft.border.only(bottom=ft.BorderSide(1, p.border)),
-                ),
+                widgets.BrandHeader("User Portal"),
                 self._search_block(),
                 ft.Container(height=1, bgcolor=p.border_soft),
                 self._results_header(),
@@ -345,50 +341,16 @@ class SearchView(BaseView):
         )
 
     def _file_header(self, result):
-        """One bar over the text: what the file is, how it scored, Drive actions.
-
-        Collapses to just the name and the score, so the reading pane can have
-        the whole height when the detail is not wanted.
-        """
+        """One bar over the text: what the file is, how it scored, Drive actions."""
         p = self.p
         folder, _, name = result["label"].rpartition("\\")
         score = self._score(result["distance"])
-        shown = self.state.get("details", True)
-
-        def toggle(_):
-            self.state["details"] = not shown
-            self.refresh()
-
-        toggle_button = widgets.IconButton(
-            # The bar collapses upwards, so the chevron points the way it goes.
-            ft.Icons.KEYBOARD_ARROW_UP_ROUNDED if shown else ft.Icons.KEYBOARD_ARROW_DOWN_ROUNDED,
-            "Hide file details" if shown else "Show file details",
-            toggle,
-        )
 
         percent = ft.Text(f"{int(score * 100)}%", size=12, weight=ft.FontWeight.W_700,
                           color=p.primary, tooltip=f"distance {result['distance']:.4f}")
 
         # The one line that separates the bar from the text under it.
         rule_below = ft.border.only(bottom=ft.BorderSide(1, p.border))
-
-        if not shown:
-            return widgets.Card(
-                ft.Row(
-                    [
-                        widgets.FileIcon(result["kind"], size=22),
-                        ft.Text(name, size=12, weight=ft.FontWeight.W_600, color=p.text_muted,
-                                max_lines=1, overflow=ft.TextOverflow.ELLIPSIS, expand=True),
-                        percent,
-                        toggle_button,
-                    ],
-                    spacing=Space.SM,
-                    vertical_alignment=ft.CrossAxisAlignment.CENTER,
-                ),
-                radius=0,
-                border=rule_below,
-                padding=ft.padding.only(left=Space.MD, right=Space.XS),
-            )
 
         def rule():
             return ft.Container(width=1, height=22, bgcolor=p.border_soft)
@@ -427,7 +389,6 @@ class SearchView(BaseView):
                         dense=True,
                         on_click=lambda _: self.not_implemented("Open in Google Drive"),
                     ),
-                    toggle_button,
                 ],
                 spacing=Space.SM,
                 vertical_alignment=ft.CrossAxisAlignment.CENTER,
@@ -435,7 +396,7 @@ class SearchView(BaseView):
             radius=0,
             border=rule_below,
             height=self.HEADER_HEIGHT,
-            padding=ft.padding.only(left=Space.MD, right=Space.XS),
+            padding=ft.padding.symmetric(horizontal=Space.MD),
         )
 
     def _file_body(self, result):

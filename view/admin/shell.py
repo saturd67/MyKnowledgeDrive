@@ -136,8 +136,7 @@ class AdminPortal:
         return ft.Container(
             content=ft.Column(
                 [
-                    ft.Container(content=widgets.Brand(portal="Admin Portal"), padding=ft.padding.all(Space.LG)),
-                    ft.Container(height=1, bgcolor=p.border_soft),
+                    widgets.BrandHeader("Admin Portal"),
                     ft.Container(
                         content=ft.Column(items, spacing=Space.XS),
                         padding=ft.padding.symmetric(horizontal=Space.MD, vertical=Space.LG),

@@ -230,10 +230,34 @@ class Brand(ft.Row):
                         ft.Text(portal, size=11, color=p.text_faint),
                     ],
                     spacing=0,
+                    # Without this the column takes the full height of the row
+                    # and stacks the two lines from the top, which reads as the
+                    # name sitting high beside the logo in a fixed-height header.
+                    tight=True,
                 ),
             ],
             spacing=Space.MD,
             vertical_alignment=ft.CrossAxisAlignment.CENTER,
+        )
+
+
+class BrandHeader(ft.Container):
+    """The block both portals open their sidebar with.
+
+    One fixed height for the two of them, so the rule under the brand lands on
+    the same line in either portal - and, in the user portal, on the same line
+    as the rule under the file bar beside it.
+    """
+
+    HEIGHT = 60
+
+    def __init__(self, portal):
+        p = palette()
+        super().__init__(
+            content=Brand(portal=portal),
+            height=self.HEIGHT,
+            padding=ft.padding.symmetric(horizontal=Space.MD),
+            border=ft.border.only(bottom=ft.BorderSide(1, p.border)),
         )
 
 

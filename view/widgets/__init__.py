@@ -14,6 +14,7 @@ from view.widgets.blocks import (
     CHECK_WIDTH,
     KEY_WIDTH,
     Brand,
+    BrandHeader,
     BrandMark,
     CheckRow,
     CheckSpacer,
@@ -49,7 +50,7 @@ __all__ = [
     "SnackBar", "EmptyState", "ProgressRow", "LogLine", "LogConsole",
     # composite blocks
     "PageHeader", "StatCard", "KvRow", "EditableRow", "CheckRow", "CheckSpacer",
-    "Hoverable", "Brand", "BrandMark", "FileIcon", "PortalRail",
+    "Hoverable", "Brand", "BrandHeader", "BrandMark", "FileIcon", "PortalRail",
     # layout constants
     "CHECK_WIDTH", "KEY_WIDTH", "SNACK_BAR_HEIGHT", "LOG_LEVEL_COLORS",
 ]
