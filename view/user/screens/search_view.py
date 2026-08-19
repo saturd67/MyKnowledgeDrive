@@ -341,13 +341,13 @@ class SearchView(BaseView):
         )
 
     def _file_header(self, result):
-        """One bar over the text: what the file is, how it scored, Drive actions."""
+        """One bar over the text: what the file is and the Drive actions.
+
+        How close the file scored is left to its row in the sidebar, which is
+        where the hits are compared against each other.
+        """
         p = self.p
         folder, _, name = result["label"].rpartition("\\")
-        score = self._score(result["distance"])
-
-        percent = ft.Text(f"{int(score * 100)}%", size=12, weight=ft.FontWeight.W_700,
-                          color=p.primary, tooltip=f"distance {result['distance']:.4f}")
 
         # The one line that separates the bar from the text under it.
         rule_below = ft.border.only(bottom=ft.BorderSide(1, p.border))
@@ -365,13 +365,6 @@ class SearchView(BaseView):
                     # a deep path is the first thing to be cut.
                     ft.Text(folder or "(root)", size=11, color=p.text_muted, expand=True,
                             max_lines=1, overflow=ft.TextOverflow.ELLIPSIS),
-                    rule(),
-                    ft.Container(
-                        content=ft.ProgressBar(value=score, bgcolor=p.surface_high,
-                                               color=p.primary, bar_height=5),
-                        width=56,
-                    ),
-                    percent,
                     rule(),
                     ft.Container(
                         content=widgets.Mono(result["id"], size=10, color=p.text, max_lines=1,
