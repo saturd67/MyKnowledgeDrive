@@ -30,12 +30,12 @@ from view.widgets.buttons import GhostButton, IconButton, PrimaryButton, Primary
 from view.widgets.containers import Card, Divider, IconBadge, Pill, Section
 from view.widgets.feedback import (
     LOG_LEVEL_COLORS,
-    SNACK_BAR_HEIGHT,
+    TONE_ICONS,
     EmptyState,
     LogConsole,
     LogLine,
+    NoticeBar,
     ProgressRow,
-    SnackBar,
 )
 from view.widgets.text import Body, Label, Mono, Subtitle, Title
 
@@ -47,10 +47,10 @@ __all__ = [
     # buttons
     "PrimaryButton", "PrimaryIconButton", "GhostButton", "IconButton",
     # feedback
-    "SnackBar", "EmptyState", "ProgressRow", "LogLine", "LogConsole",
+    "NoticeBar", "EmptyState", "ProgressRow", "LogLine", "LogConsole",
     # composite blocks
     "PageHeader", "StatCard", "KvRow", "EditableRow", "CheckRow", "CheckSpacer",
     "Hoverable", "Brand", "BrandHeader", "BrandMark", "FileIcon", "PortalRail",
     # layout constants
-    "CHECK_WIDTH", "KEY_WIDTH", "SNACK_BAR_HEIGHT", "LOG_LEVEL_COLORS",
+    "CHECK_WIDTH", "KEY_WIDTH", "TONE_ICONS", "LOG_LEVEL_COLORS",
 ]

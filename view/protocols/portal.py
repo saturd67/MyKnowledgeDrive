@@ -6,6 +6,9 @@ be driven by a stub in a test.
 
 These are structural protocols: AdminPortal and UserPortal satisfy them by
 having the right members, not by inheriting. Nothing has to be registered.
+They do share a base class - `view/base_portal.py` - but that is only there
+to hold the code both shells would otherwise repeat; a screen is typed
+against the protocol, so anything with these members will do.
 """
 
 from typing import Protocol, runtime_checkable
@@ -31,8 +34,8 @@ class Portal(Protocol):
         """Rebuild just the active screen - pagination, filters, ..."""
         ...
 
-    def notify(self, message: str, tone_name: str = "neutral") -> None:
-        """Raise a snack bar."""
+    def show_notice_bar(self, message: str, tone_name: str = "neutral") -> None:
+        """Show `message` in the notice banner at the top of the page."""
         ...
 
     def not_implemented(self, feature: str) -> None:

@@ -55,7 +55,7 @@ class SettingsView(BaseView):
                         widgets.GhostButton(
                             "Open config folder",
                             icon=ft.Icons.FOLDER_OPEN_ROUNDED,
-                            on_click=lambda _: self.not_implemented("Open config folder"),
+                            on_click=lambda _: self.portal.not_implemented("Open config folder"),
                         ),
                     ],
                 ),
@@ -106,30 +106,30 @@ class SettingsView(BaseView):
     def _save(self, keys, what):
         edits = self._pending(keys)
         if not edits:
-            self.notify(f"No changes to {what}.", "neutral")
+            self.portal.show_notice_bar(f"No changes to {what}.", "neutral")
             return
 
         error = self._validate(edits)
         if error:
-            self.notify(error, "danger")
+            self.portal.show_notice_bar(error, "danger")
             return
 
         try:
             settingService.set_many(edits)
         except Exception as error:
-            self.notify(f"Could not save {what}: {error}", "danger")
+            self.portal.show_notice_bar(f"Could not save {what}: {error}", "danger")
             return
 
         for key in edits:
             self.state["settings_edits"].pop(key, None)
 
         if any(key in DESTRUCTIVE_KEYS for key in edits):
-            self.notify(
+            self.portal.show_notice_bar(
                 f"Saved {what}. The existing collection no longer matches - run a reset.",
                 "warning",
             )
         else:
-            self.notify(f"Saved {what}.", "success")
+            self.portal.show_notice_bar(f"Saved {what}.", "success")
 
         self.refresh()
 
@@ -138,7 +138,7 @@ class SettingsView(BaseView):
             return
         for key in keys:
             self.state["settings_edits"].pop(key, None)
-        self.notify(f"Reverted {what}.", "neutral")
+        self.portal.show_notice_bar(f"Reverted {what}.", "neutral")
         self.refresh()
 
     # --- rows ----------------------------------------------------------------
@@ -147,7 +147,7 @@ class SettingsView(BaseView):
         return widgets.IconButton(
             ft.Icons.CONTENT_COPY_ROUNDED,
             f"Copy {what}",
-            lambda _: self.not_implemented(f"Copy {what}"),
+            lambda _: self.portal.not_implemented(f"Copy {what}"),
         )
 
     def _edit_row(self, key, values):

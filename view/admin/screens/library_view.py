@@ -48,7 +48,7 @@ class LibraryView(BaseView):
                         widgets.GhostButton(
                             "Refresh",
                             icon=ft.Icons.REFRESH_ROUNDED,
-                            on_click=lambda _: self.not_implemented("Refresh library"),
+                            on_click=lambda _: self.portal.not_implemented("Refresh library"),
                         ),
                     ],
                 ),
@@ -284,9 +284,9 @@ class LibraryView(BaseView):
                     ft.Row(
                         [
                             widgets.IconButton(ft.Icons.CONTENT_COPY_ROUNDED, "Copy document id",
-                                          lambda _: self.not_implemented("Copy document id")),
+                                          lambda _: self.portal.not_implemented("Copy document id")),
                             widgets.IconButton(ft.Icons.OPEN_IN_NEW_ROUNDED, "Open in Google Drive",
-                                          lambda _: self.not_implemented("Open in Google Drive")),
+                                          lambda _: self.portal.not_implemented("Open in Google Drive")),
                         ],
                         spacing=0,
                         width=ACTIONS_WIDTH,

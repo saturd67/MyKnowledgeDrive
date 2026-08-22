@@ -7,37 +7,41 @@ import flet as ft
 
 from view import theme
 from view import widgets
-from view.theme import palette
+from view.base_portal import BasePortal
+from view.theme import Space, palette
 from view.user.screens.search_view import SearchView
 
 
-class UserPortal:
+class UserPortal(BasePortal):
+
+    title = "MyKnowledgeDrive - User Portal"
+
+    # The reading pane runs to the window edges, so the notice carries its own
+    # margin on every side.
+    notice_padding = ft.padding.only(
+        left=Space.XL, right=Space.XL, top=Space.XL, bottom=Space.SM
+    )
 
     def __init__(self, page):
-        self.page = page
-        self.state = {
+        super().__init__(page)
+        self._panel = ft.Container()
+
+    def initial_state(self):
+        return {
             "query": "",
             "mode": "hero",      # hero | searching | results | empty
             "selected": 0,
         }
-        self._body = ft.Container(expand=True)
-        self._panel = ft.Container()
 
     # --- lifecycle ----------------------------------------------------------
-
-    def start(self, set_window=True):
-        self.page.title = "MyKnowledgeDrive - User Portal"
-        self.page.padding = 0
-        self.page.spacing = 0
-        if set_window:
-            theme.apply_window(self.page)
-        self.render()
 
     def render(self):
         theme.apply(self.page)
         self.page.controls.clear()
 
         p = palette()
+        self._notice = ft.Container()
+        self._fill_notice()
         search_view = SearchView(self)
         self._panel = ft.Container(
             content=search_view.build_panel(),
@@ -52,7 +56,9 @@ class UserPortal:
                 [
                     widgets.PortalRail(self.page, "user"),
                     self._panel,
-                    self._body,
+                    # The reading pane runs to the window edges, so the notice
+                    # is stacked over it rather than dropped inside it.
+                    ft.Column([self._notice, self._body], spacing=0, expand=True),
                 ],
                 spacing=0,
                 expand=True,
@@ -70,14 +76,6 @@ class UserPortal:
         self._body.update()
 
     # --- helpers available to the screen -------------------------------------
-
-    def notify(self, message, tone_name="neutral"):
-        self.page.open(widgets.SnackBar(self.page, message, tone_name))
-
-    def not_implemented(self, feature):
-        # TODO: wire to TextEmbedderService.query(), then open
-        # https://drive.google.com/file/d/<id> for the picked result
-        self.notify(f"{feature} is not wired up yet - this is the UI shell.", "info")
 
     def search(self, query):
         self.state["query"] = query

@@ -1020,7 +1020,7 @@ class LibrarySyncView(BaseView):
 
     def _cancel(self):
         self.state["sync_cancel"] = True
-        self.notify("Stopping after the current file.", "warning")
+        self.portal.show_notice_bar("Stopping after the current file.", "warning")
 
     def _play(self, script, stages):
         """Step through a scripted run, refreshing at each line.
@@ -1102,7 +1102,7 @@ class LibrarySyncView(BaseView):
         self.state["sync_stage"] = "done" if completed else "reviewing"
         self.refresh()
         if completed:
-            self.notify(f"Updated {len(picked)} files.", "success")
+            self.portal.show_notice_bar(f"Updated {len(picked)} files.", "success")
 
     # --- reset side panel ----------------------------------------------------
 
@@ -1270,4 +1270,4 @@ class LibrarySyncView(BaseView):
         self.page.close(alert_dialog)
         # TODO: wire to FileConverterService.start_convert_files() then
         # TextEmbedderService.reset_collection() + embed_collection()
-        self.not_implemented("Reset library")
+        self.portal.not_implemented("Reset library")

@@ -10,6 +10,7 @@ from view import widgets
 from view.admin.screens.library_sync_view import LibrarySyncView
 from view.admin.screens.library_view import LibraryView
 from view.admin.screens.settings_view import SettingsView
+from view.base_portal import BasePortal
 from view.theme import Radius, Space, palette
 
 # text, icon, selected icon, BaseView subclass
@@ -20,12 +21,16 @@ NAV_ITEMS = [
 ]
 
 
-class AdminPortal:
+class AdminPortal(BasePortal):
+
+    title = "MyKnowledgeDrive - Admin Portal"
 
     def __init__(self, page):
-        self.page = page
+        super().__init__(page)
         self.index = 0
-        self.state = {
+
+    def initial_state(self):
+        return {
             "library_filter": "",
             # Folder path -> bool. Absent means closed, so only the folders you
             # actually opened are tracked.
@@ -59,22 +64,15 @@ class AdminPortal:
             "sync_error": None,
             "sync_cancel": False,
         }
-        self._body = ft.Container(expand=True)
 
     # --- lifecycle ----------------------------------------------------------
-
-    def start(self, set_window=True):
-        self.page.title = "MyKnowledgeDrive - Admin Portal"
-        self.page.padding = 0
-        self.page.spacing = 0
-        if set_window:
-            theme.apply_window(self.page)
-        self.render()
 
     def render(self):
         """Full rebuild - also used when the colour mode changes."""
         theme.apply(self.page)
         self.page.controls.clear()
+        self._notice = ft.Container()
+        self._fill_notice()
         self._body = ft.Container(content=self._view(), expand=True)
         self.page.add(
             ft.Row(
@@ -93,16 +91,9 @@ class AdminPortal:
 
     def navigate(self, index):
         self.index = index
+        # A message belongs to the screen that raised it.
+        self.state["notice"] = None
         self.render()
-
-    # --- helpers available to the screens ------------------------------------
-
-    def notify(self, message, tone_name="neutral"):
-        self.page.open(widgets.SnackBar(self.page, message, tone_name))
-
-    def not_implemented(self, feature):
-        # TODO: wire to the matching FileConverterService/TextEmbedderService call
-        self.notify(f"{feature} is not wired up yet - this is the UI shell.", "info")
 
     # --- layout --------------------------------------------------------------
 
@@ -114,12 +105,20 @@ class AdminPortal:
     def _content(self):
         """Wrapped in a page scroll unless the screen scrolls something of its
         own. Only navigate() swaps screens, and that re-renders, so reading the
-        flag once here is enough."""
+        flag once here is enough. The notice sits above that scroll, so a
+        message cannot be scrolled out of sight."""
         scrolls = NAV_ITEMS[self.index][3].scrolls
         return ft.Container(
             content=ft.Column(
-                [self._body],
-                scroll=ft.ScrollMode.AUTO if scrolls else None,
+                [
+                    self._notice,
+                    ft.Column(
+                        [self._body],
+                        scroll=ft.ScrollMode.AUTO if scrolls else None,
+                        expand=True,
+                    ),
+                ],
+                spacing=0,
                 expand=True,
             ),
             padding=ft.padding.symmetric(horizontal=Space.XXL, vertical=Space.XXL),

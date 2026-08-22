@@ -48,9 +48,3 @@ class BaseView(ABC):
 
     def refresh(self) -> None:
         self.portal.refresh()
-
-    def notify(self, message: str, tone_name: str = "neutral") -> None:
-        self.portal.notify(message, tone_name)
-
-    def not_implemented(self, feature: str) -> None:
-        self.portal.not_implemented(feature)
