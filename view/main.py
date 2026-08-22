@@ -4,4 +4,4 @@
 def main(page):
     """Flet target - opens the portal the app starts on."""
     from view.widgets import PortalRail
-    PortalRail.start(page)
+    PortalRail.start(page, "user")

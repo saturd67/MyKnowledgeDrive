@@ -287,7 +287,6 @@ class PortalRail(ft.Container):
         ("user", "User portal", ft.Icons.TRAVEL_EXPLORE_ROUNDED),
         ("admin", "Admin portal", ft.Icons.ADMIN_PANEL_SETTINGS_ROUNDED),
     ]
-    DEFAULT_PORTAL = "user"
 
     def __init__(self, page, active):
         p = palette()
@@ -331,7 +330,7 @@ class PortalRail(ft.Container):
         )
 
     @staticmethod
-    def start(page, portal=DEFAULT_PORTAL, set_window=True):
+    def start(page, portal, set_window=True):
         """Render `portal` onto `page`.
 
         Imports are local: both portal shells import this module (to place
