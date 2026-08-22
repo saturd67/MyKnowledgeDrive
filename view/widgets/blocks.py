@@ -287,6 +287,7 @@ class PortalRail(ft.Container):
         ("user", "User portal", ft.Icons.TRAVEL_EXPLORE_ROUNDED),
         ("admin", "Admin portal", ft.Icons.ADMIN_PANEL_SETTINGS_ROUNDED),
     ]
+    DEFAULT_PORTAL = "user"
 
     def __init__(self, page, active):
         p = palette()
@@ -330,13 +331,26 @@ class PortalRail(ft.Container):
         )
 
     @staticmethod
+    def start(page, portal=DEFAULT_PORTAL, set_window=True):
+        """Render `portal` onto `page`.
+
+        Imports are local: both portal shells import this module (to place
+        the rail), and this call constructs a shell, so module-level imports
+        would cycle.
+        """
+        if portal == "admin":
+            from view.admin.shell import AdminPortal
+            AdminPortal(page).start(set_window=set_window)
+        else:
+            from view.user.shell import UserPortal
+            UserPortal(page).start(set_window=set_window)
+
+    @staticmethod
     def switch(page, target):
         """Swap the whole page over to the other portal.
 
         The window keeps whatever size the user has given it - only the
         launcher sets the geometry.
         """
-        from view.main import start
-
         page.controls.clear()
-        start(page, target, set_window=False)
+        PortalRail.start(page, target, set_window=False)
