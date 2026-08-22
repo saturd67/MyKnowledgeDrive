@@ -8,6 +8,10 @@ through every helper.
 
 Subclasses put their markup in `build()` and everything it needs in private
 methods; the shell only ever calls `ViewClass(portal).build()`.
+
+Whatever a screen needs from its shell - the page, the state, a refresh, a
+notice - it asks `self.portal` for by name. There are no passthroughs here,
+so reading a screen tells you which of them it actually leans on.
 """
 
 from abc import ABC, abstractmethod
@@ -35,16 +39,3 @@ class BaseView(ABC):
     def build(self) -> ft.Control:
         """Return the control tree for this screen."""
         raise NotImplementedError
-
-    # --- shell passthroughs --------------------------------------------------
-
-    @property
-    def state(self) -> dict:
-        return self.portal.state
-
-    @property
-    def page(self) -> ft.Page:
-        return self.portal.page
-
-    def refresh(self) -> None:
-        self.portal.refresh()

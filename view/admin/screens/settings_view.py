@@ -83,11 +83,11 @@ class SettingsView(BaseView):
     def _values(self):
         """Saved values with any unsaved edits laid over the top."""
         values = dict(settingService.get_all())
-        values.update(self.state["settings_edits"])
+        values.update(self.portal.state["settings_edits"])
         return values
 
     def _pending(self, keys):
-        edits = self.state["settings_edits"]
+        edits = self.portal.state["settings_edits"]
         return {key: edits[key] for key in keys if key in edits}
 
     @staticmethod
@@ -121,7 +121,7 @@ class SettingsView(BaseView):
             return
 
         for key in edits:
-            self.state["settings_edits"].pop(key, None)
+            self.portal.state["settings_edits"].pop(key, None)
 
         if any(key in DESTRUCTIVE_KEYS for key in edits):
             self.portal.show_notice_bar(
@@ -131,15 +131,15 @@ class SettingsView(BaseView):
         else:
             self.portal.show_notice_bar(f"Saved {what}.", "success")
 
-        self.refresh()
+        self.portal.refresh()
 
     def _revert(self, keys, what):
         if not self._pending(keys):
             return
         for key in keys:
-            self.state["settings_edits"].pop(key, None)
+            self.portal.state["settings_edits"].pop(key, None)
         self.portal.show_notice_bar(f"Reverted {what}.", "neutral")
-        self.refresh()
+        self.portal.refresh()
 
     # --- rows ----------------------------------------------------------------
 
@@ -154,7 +154,7 @@ class SettingsView(BaseView):
         def on_change(e):
             # Held until Save - rebuilding the screen on every keystroke would
             # drop focus out of the field.
-            self.state["settings_edits"][key] = e.control.value
+            self.portal.state["settings_edits"][key] = e.control.value
 
         return widgets.EditableRow(
             LABELS[key],

@@ -122,8 +122,8 @@ class LibrarySyncView(BaseView):
         self._refs = {}
 
     def build(self):
-        mode = self.state["sync_mode"]
-        stage = self.state["sync_stage"]
+        mode = self.portal.state["sync_mode"]
+        stage = self.portal.state["sync_stage"]
         self._refs = {}
 
         heading, description = {
@@ -214,17 +214,17 @@ class LibrarySyncView(BaseView):
 
     def _mode_switch(self):
         p = self.p
-        busy = self.state["sync_stage"] in ("scanning", "updating")
+        busy = self.portal.state["sync_stage"] in ("scanning", "updating")
 
         def select(key):
             def handler(_):
-                self.state["sync_mode"] = key
-                self.refresh()
+                self.portal.state["sync_mode"] = key
+                self.portal.refresh()
             return handler
 
         buttons = []
         for key, text, icon in MODES:
-            active = key == self.state["sync_mode"]
+            active = key == self.portal.state["sync_mode"]
             fg = p.primary if (active and key == "sync") else (p.danger if active else p.text_muted)
             if busy and not active:
                 fg = p.text_faint
@@ -272,7 +272,7 @@ class LibrarySyncView(BaseView):
             )
 
         if mode == "reset":
-            armed = self.state["reset_confirm"].strip() == CONFIRM_WORD
+            armed = self.portal.state["reset_confirm"].strip() == CONFIRM_WORD
             return ft.FilledButton(
                 text="Reset library",
                 icon=ft.Icons.DELETE_FOREVER_ROUNDED,
@@ -302,7 +302,7 @@ class LibrarySyncView(BaseView):
             )
 
         # reviewing - the label carries the live selection count.
-        selected = len(self.state["scan_selected"])
+        selected = len(self.portal.state["scan_selected"])
         filled_button = ft.FilledButton(
             text=self._run_label(selected),
             icon=ft.Icons.PLAY_ARROW_ROUNDED,
@@ -329,8 +329,8 @@ class LibrarySyncView(BaseView):
 
     def _steps(self, stages, accent, heading, description):
         p = self.p
-        stage = self.state["sync_stage"]
-        progress = self.state["sync_progress"]
+        stage = self.portal.state["sync_stage"]
+        progress = self.portal.state["sync_progress"]
 
         if stage in ("idle", "reviewing"):
             active_index = -1
@@ -402,9 +402,9 @@ class LibrarySyncView(BaseView):
 
     def _console(self, mode):
         if mode == "reset":
-            lines = data.RESET_LOG if self.state["sync_stage"] == "done" else []
+            lines = data.RESET_LOG if self.portal.state["sync_stage"] == "done" else []
         else:
-            lines = self.state["sync_log"]
+            lines = self.portal.state["sync_log"]
 
         content = (
             widgets.LogConsole(lines)
@@ -430,16 +430,16 @@ class LibrarySyncView(BaseView):
         return STATUS_META[change["status"]][2]
 
     def _in_group(self, group_key):
-        return [c for c in self.state["scan_changes"] if self._group_of(c) == group_key]
+        return [c for c in self.portal.state["scan_changes"] if self._group_of(c) == group_key]
 
     def _visible(self, changes):
-        needle = self.state["scan_filter"].strip().lower()
+        needle = self.portal.state["scan_filter"].strip().lower()
         if not needle:
             return changes
         return [c for c in changes if needle in c["key"].lower()]
 
     def _scan_strip(self):
-        stats = self.state["scan_stats"] or {}
+        stats = self.portal.state["scan_stats"] or {}
         return widgets.Card(
             ft.Row(
                 [
@@ -453,8 +453,8 @@ class LibrarySyncView(BaseView):
         )
 
     def _counts(self):
-        changes = self.state["scan_changes"]
-        result = self.state["sync_result"]
+        changes = self.portal.state["scan_changes"]
+        result = self.portal.state["sync_result"]
 
         if result:
             tiles = [
@@ -480,7 +480,7 @@ class LibrarySyncView(BaseView):
         )
 
     def _results(self):
-        changes = self.state["scan_changes"]
+        changes = self.portal.state["scan_changes"]
         if not changes:
             return widgets.Section(
                 "Changes",
@@ -491,7 +491,7 @@ class LibrarySyncView(BaseView):
                 ),
             )
 
-        wanted = self.state["scan_status_filter"]
+        wanted = self.portal.state["scan_status_filter"]
         blocks = []
         for group_key, heading, description, tone_name, tickable, allow_all in GROUPS:
             if wanted != "all" and wanted != group_key:
@@ -520,37 +520,37 @@ class LibrarySyncView(BaseView):
 
     def _toolbar(self):
         p = self.p
-        read_only = self.state["sync_stage"] != "reviewing"
+        read_only = self.portal.state["sync_stage"] != "reviewing"
 
         def on_filter(e):
-            self.state["scan_filter"] = e.control.value
-            self.refresh()
+            self.portal.state["scan_filter"] = e.control.value
+            self.portal.refresh()
 
         def on_status(e):
-            self.state["scan_status_filter"] = e.control.value
-            self.refresh()
+            self.portal.state["scan_status_filter"] = e.control.value
+            self.portal.refresh()
 
         def select_all(_):
             # Removals are excluded on purpose - they are deletions, so they only
             # ever get ticked one at a time.
-            self.state["scan_selected"] = {
-                c["key"] for c in self.state["scan_changes"]
+            self.portal.state["scan_selected"] = {
+                c["key"] for c in self.portal.state["scan_changes"]
                 if self._group_of(c) in ("add", "update")
             }
-            self.refresh()
+            self.portal.refresh()
 
         def clear(_):
-            self.state["scan_selected"] = set()
-            self.refresh()
+            self.portal.state["scan_selected"] = set()
+            self.portal.refresh()
 
         def set_folders(is_open):
             def handler(_):
-                self.state["scan_folders_open"] = {i: is_open for i in self._folder_ids()}
-                self.refresh()
+                self.portal.state["scan_folders_open"] = {i: is_open for i in self._folder_ids()}
+                self.portal.refresh()
             return handler
 
         text_field = ft.TextField(
-            value=self.state["scan_filter"],
+            value=self.portal.state["scan_filter"],
             hint_text="Filter by path",
             hint_style=ft.TextStyle(size=12, color=p.text_faint),
             prefix_icon=ft.Icons.SEARCH_ROUNDED,
@@ -570,7 +570,7 @@ class LibrarySyncView(BaseView):
 
         container = ft.Container(
             content=ft.Dropdown(
-                value=self.state["scan_status_filter"],
+                value=self.portal.state["scan_status_filter"],
                 options=[ft.dropdown.Option(key, text) for key, text in STATUS_FILTERS],
                 width=150,
                 text_size=12,
@@ -602,14 +602,14 @@ class LibrarySyncView(BaseView):
     def _group(self, group_key, heading, description, tone_name, tickable, allow_all, rows):
         p = self.p
         fg, bg = tone(tone_name)
-        is_open = self.state["scan_groups_open"].get(group_key, True)
-        read_only = self.state["sync_stage"] != "reviewing"
-        selected = self.state["scan_selected"]
+        is_open = self.portal.state["scan_groups_open"].get(group_key, True)
+        read_only = self.portal.state["sync_stage"] != "reviewing"
+        selected = self.portal.state["scan_selected"]
         ticked = sum(1 for r in rows if r["key"] in selected)
 
         def toggle_open(_):
-            self.state["scan_groups_open"][group_key] = not is_open
-            self.refresh()
+            self.portal.state["scan_groups_open"][group_key] = not is_open
+            self.portal.refresh()
 
         def toggle_all(e):
             keys = {r["key"] for r in rows}
@@ -617,7 +617,7 @@ class LibrarySyncView(BaseView):
                 selected.update(keys)
             else:
                 selected.difference_update(keys)
-            self.refresh()
+            self.portal.refresh()
 
         icon = ft.Icon(
             ft.Icons.EXPAND_MORE_ROUNDED if is_open else ft.Icons.CHEVRON_RIGHT_ROUNDED,
@@ -677,7 +677,7 @@ class LibrarySyncView(BaseView):
             )
         else:
             shown = visible
-            if group_key == "unchanged" and not self.state["scan_show_all_unchanged"]:
+            if group_key == "unchanged" and not self.portal.state["scan_show_all_unchanged"]:
                 shown = visible[:UNCHANGED_PREVIEW]
 
             row_tickable = tickable and not read_only
@@ -729,13 +729,13 @@ class LibrarySyncView(BaseView):
         """Folders start open where you are expected to act, closed in the
         long tail. An explicit click always wins."""
         default = group_key not in ("blocked", "unchanged")
-        return self.state["scan_folders_open"].get(f"{group_key}|{path}", default)
+        return self.portal.state["scan_folders_open"].get(f"{group_key}|{path}", default)
 
     def _folder_ids(self):
         """Every folder id in every group, including the prefixes that chain
         collapsing hides - setting one of those is harmless."""
         ids = set()
-        for change in self.state["scan_changes"]:
+        for change in self.portal.state["scan_changes"]:
             group_key = self._group_of(change)
             folder = change["key"].rpartition("\\")[0]
             segments = folder.split("\\") if folder else []
@@ -762,19 +762,19 @@ class LibrarySyncView(BaseView):
     def _folder_row(self, group_key, path, label, node, tickable, depth, is_open):
         p = self.p
         keys = self._node_keys(node)
-        ticked = len(keys & self.state["scan_selected"])
+        ticked = len(keys & self.portal.state["scan_selected"])
 
         def toggle_tick(e):
             if e.control.value:
-                self.state["scan_selected"].update(keys)
+                self.portal.state["scan_selected"].update(keys)
             else:
-                self.state["scan_selected"].difference_update(keys)
-            self.refresh()
+                self.portal.state["scan_selected"].difference_update(keys)
+            self.portal.refresh()
 
         def toggle_open(_):
-            folders = self.state["scan_folders_open"]
+            folders = self.portal.state["scan_folders_open"]
             folders[f"{group_key}|{path}"] = not is_open
-            self.refresh()
+            self.portal.refresh()
 
         container = ft.Container(
             content=ft.Row(
@@ -848,8 +848,8 @@ class LibrarySyncView(BaseView):
 
     def _show_all(self, remaining):
         def handler(_):
-            self.state["scan_show_all_unchanged"] = True
-            self.refresh()
+            self.portal.state["scan_show_all_unchanged"] = True
+            self.portal.refresh()
 
         return ft.Container(
             content=widgets.GhostButton(f"Show {remaining} more", on_click=handler, dense=True),
@@ -860,13 +860,13 @@ class LibrarySyncView(BaseView):
         p = self.p
         label, tone_name, _ = STATUS_META[change["status"]]
         name = change["key"].rpartition("\\")[2]
-        selected = change["key"] in self.state["scan_selected"]
+        selected = change["key"] in self.portal.state["scan_selected"]
 
         def on_toggle(e):
             if e.control.value:
-                self.state["scan_selected"].add(change["key"])
+                self.portal.state["scan_selected"].add(change["key"])
             else:
-                self.state["scan_selected"].discard(change["key"])
+                self.portal.state["scan_selected"].discard(change["key"])
             self._retick(group_key)
             self._relabel_run_button()
 
@@ -911,7 +911,7 @@ class LibrarySyncView(BaseView):
             padding=ft.padding.only(left=Space.MD + depth * INDENT, right=Space.MD,
                                     top=Space.SM, bottom=Space.SM),
             border_radius=Radius.SM,
-            opacity=0.55 if self.state["sync_stage"] == "updating" else 1,
+            opacity=0.55 if self.portal.state["sync_stage"] == "updating" else 1,
             on_hover=on_hover,
         )
 
@@ -933,7 +933,7 @@ class LibrarySyncView(BaseView):
         Ticking a row must never call refresh() - that rebuilds every control
         on the screen. Only the boxes above the toggled row change.
         """
-        selected = self.state["scan_selected"]
+        selected = self.portal.state["scan_selected"]
 
         for node_group, checkbox, keys in self._refs.get("nodes", []):
             if node_group != group_key:
@@ -959,7 +959,7 @@ class LibrarySyncView(BaseView):
         filled_button = self._refs.get("run")
         if filled_button is None:
             return
-        selected = len(self.state["scan_selected"])
+        selected = len(self.portal.state["scan_selected"])
         filled_button.text = self._run_label(selected)
         filled_button.disabled = selected == 0
         filled_button.update()
@@ -967,7 +967,7 @@ class LibrarySyncView(BaseView):
     # --- sync side panel -----------------------------------------------------
 
     def _summary(self):
-        stage = self.state["sync_stage"]
+        stage = self.portal.state["sync_stage"]
 
         if stage == "idle":
             return widgets.Section(
@@ -997,7 +997,7 @@ class LibrarySyncView(BaseView):
                 ),
             )
 
-        selected = len(self.state["scan_selected"])
+        selected = len(self.portal.state["scan_selected"])
         return widgets.Section(
             "This run",
             "Only the ticked files are touched.",
@@ -1016,10 +1016,10 @@ class LibrarySyncView(BaseView):
     # --- runs (scripted for now) ---------------------------------------------
 
     def _log(self, level, message):
-        self.state["sync_log"].append((time.strftime("%H:%M:%S"), level, message))
+        self.portal.state["sync_log"].append((time.strftime("%H:%M:%S"), level, message))
 
     def _cancel(self):
-        self.state["sync_cancel"] = True
+        self.portal.state["sync_cancel"] = True
         self.portal.show_notice_bar("Stopping after the current file.", "warning")
 
     def _play(self, script, stages):
@@ -1030,20 +1030,20 @@ class LibrarySyncView(BaseView):
         services behind page.run_thread.
         """
         for index, (level, message) in enumerate(script):
-            if self.state["sync_cancel"]:
+            if self.portal.state["sync_cancel"]:
                 self._log("WARN", "Cancelled")
-                self.refresh()
+                self.portal.refresh()
                 return False
             time.sleep(0.4)
             self._log(level, message)
             fraction = (index + 1) / len(script)
             step = min(int(fraction * len(stages)) + 1, len(stages))
-            self.state["sync_progress"] = (f"Step {step} of {len(stages)}", fraction)
-            self.refresh()
+            self.portal.state["sync_progress"] = (f"Step {step} of {len(stages)}", fraction)
+            self.portal.refresh()
         return True
 
     def _scan(self):
-        self.state.update({
+        self.portal.state.update({
             "sync_stage": "scanning",
             "sync_log": [],
             "sync_error": None,
@@ -1057,50 +1057,50 @@ class LibrarySyncView(BaseView):
             "scan_show_all_unchanged": False,
             "sync_progress": ("Step 1 of 3", 0.0),
         })
-        self.refresh()
+        self.portal.refresh()
 
         if not self._play(SCAN_SCRIPT, SCAN_STAGES):
-            self.state["sync_stage"] = "idle"
-            self.state["sync_progress"] = None
-            self.refresh()
+            self.portal.state["sync_stage"] = "idle"
+            self.portal.state["sync_progress"] = None
+            self.portal.refresh()
             return
 
         changes = [dict(change) for change in data.SCAN_CHANGES]
-        self.state["scan_changes"] = changes
+        self.portal.state["scan_changes"] = changes
         # Adds and updates start ticked; removals never do - they are deletions.
-        self.state["scan_selected"] = {
+        self.portal.state["scan_selected"] = {
             c["key"] for c in changes if self._group_of(c) in ("add", "update")
         }
-        self.state["scan_stats"] = data.SCAN_STATS
-        self.state["sync_progress"] = None
-        self.state["sync_stage"] = "reviewing"
-        self.refresh()
+        self.portal.state["scan_stats"] = data.SCAN_STATS
+        self.portal.state["sync_progress"] = None
+        self.portal.state["sync_stage"] = "reviewing"
+        self.portal.refresh()
 
     def _update(self):
-        selected = set(self.state["scan_selected"])
+        selected = set(self.portal.state["scan_selected"])
         if not selected:
             return
 
-        self.state["sync_stage"] = "updating"
-        self.state["sync_cancel"] = False
-        self.state["sync_progress"] = ("Step 1 of 3", 0.0)
+        self.portal.state["sync_stage"] = "updating"
+        self.portal.state["sync_cancel"] = False
+        self.portal.state["sync_progress"] = ("Step 1 of 3", 0.0)
         self._log("INFO", f"Updating {len(selected)} selected files")
-        self.refresh()
+        self.portal.refresh()
 
         completed = self._play(APPLY_SCRIPT, APPLY_STAGES)
 
-        picked = [c for c in self.state["scan_changes"] if c["key"] in selected]
-        self.state["sync_result"] = {
+        picked = [c for c in self.portal.state["scan_changes"] if c["key"] in selected]
+        self.portal.state["sync_result"] = {
             "converted": sum(1 for c in picked if c["needs_conversion"]),
             "added": sum(1 for c in picked if c["status"] == "added"),
             "updated": sum(1 for c in picked if c["status"] in ("updated", "stale_local")),
             "removed": sum(1 for c in picked if c["status"] == "removed"),
-            "skipped": len(self.state["scan_changes"]) - len(picked),
+            "skipped": len(self.portal.state["scan_changes"]) - len(picked),
             "failed": 0,
         }
-        self.state["sync_progress"] = None
-        self.state["sync_stage"] = "done" if completed else "reviewing"
-        self.refresh()
+        self.portal.state["sync_progress"] = None
+        self.portal.state["sync_stage"] = "done" if completed else "reviewing"
+        self.portal.refresh()
         if completed:
             self.portal.show_notice_bar(f"Updated {len(picked)} files.", "success")
 
@@ -1186,14 +1186,14 @@ class LibrarySyncView(BaseView):
 
     def _confirm(self):
         p = self.p
-        typed = self.state["reset_confirm"]
+        typed = self.portal.state["reset_confirm"]
         armed = typed.strip() == CONFIRM_WORD
 
         def on_change(e):
-            was_armed = self.state["reset_confirm"].strip() == CONFIRM_WORD
-            self.state["reset_confirm"] = e.control.value
+            was_armed = self.portal.state["reset_confirm"].strip() == CONFIRM_WORD
+            self.portal.state["reset_confirm"] = e.control.value
             if (e.control.value.strip() == CONFIRM_WORD) != was_armed:
-                self.refresh()
+                self.portal.refresh()
 
         text_field = ft.TextField(
             value=typed,
@@ -1255,7 +1255,7 @@ class LibrarySyncView(BaseView):
                 width=360,
             ),
             actions=[
-                widgets.GhostButton("Cancel", on_click=lambda _: self.page.close(alert_dialog)),
+                widgets.GhostButton("Cancel", on_click=lambda _: self.portal.page.close(alert_dialog)),
                 widgets.PrimaryButton(
                     "Yes, reset",
                     tone_name="danger",
@@ -1264,10 +1264,10 @@ class LibrarySyncView(BaseView):
             ],
             actions_alignment=ft.MainAxisAlignment.END,
         )
-        self.page.open(alert_dialog)
+        self.portal.page.open(alert_dialog)
 
     def _confirmed(self, alert_dialog):
-        self.page.close(alert_dialog)
+        self.portal.page.close(alert_dialog)
         # TODO: wire to FileConverterService.start_convert_files() then
         # TextEmbedderService.reset_collection() + embed_collection()
         self.portal.not_implemented("Reset library")
