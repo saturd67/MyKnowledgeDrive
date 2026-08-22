@@ -38,14 +38,14 @@ class UserPortal:
         self.page.controls.clear()
 
         p = palette()
-        view = SearchView(self)
+        search_view = SearchView(self)
         self._panel = ft.Container(
-            content=view.build_panel(),
+            content=search_view.build_panel(),
             width=SearchView.PANEL_WIDTH,
             bgcolor=p.sidebar,
             border=ft.border.only(right=ft.BorderSide(1, p.border)),
         )
-        self._body = ft.Container(content=view.build(), expand=True)
+        self._body = ft.Container(content=search_view.build(), expand=True)
 
         self.page.add(
             ft.Row(
@@ -63,10 +63,10 @@ class UserPortal:
 
     def refresh(self):
         """Both panes are rebuilt together - picking a hit changes each of them."""
-        view = SearchView(self)
-        self._panel.content = view.build_panel()
+        search_view = SearchView(self)
+        self._panel.content = search_view.build_panel()
         self._panel.update()
-        self._body.content = view.build()
+        self._body.content = search_view.build()
         self._body.update()
 
     # --- helpers available to the screen -------------------------------------

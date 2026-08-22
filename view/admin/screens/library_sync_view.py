@@ -303,7 +303,7 @@ class LibrarySyncView(BaseView):
 
         # reviewing - the label carries the live selection count.
         selected = len(self.state["scan_selected"])
-        button = ft.FilledButton(
+        filled_button = ft.FilledButton(
             text=self._run_label(selected),
             icon=ft.Icons.PLAY_ARROW_ROUNDED,
             disabled=selected == 0,
@@ -316,8 +316,8 @@ class LibrarySyncView(BaseView):
                 text_style=ft.TextStyle(size=13, weight=ft.FontWeight.W_600),
             ),
         )
-        self._refs["run"] = button
-        return button
+        self._refs["run"] = filled_button
+        return filled_button
 
     @staticmethod
     def _run_label(selected):
@@ -375,17 +375,17 @@ class LibrarySyncView(BaseView):
 
         if progress:
             caption, fraction = progress
-            bar = widgets.ProgressRow(caption, fraction, accent)
+            progress_row = widgets.ProgressRow(caption, fraction, accent)
         elif stage == "done":
-            bar = widgets.ProgressRow("Completed", 1.0, "success")
+            progress_row = widgets.ProgressRow("Completed", 1.0, "success")
         else:
-            bar = widgets.ProgressRow("Waiting to start", 0.0, "neutral")
+            progress_row = widgets.ProgressRow("Waiting to start", 0.0, "neutral")
 
         return widgets.Section(
             heading,
             description,
             trailing=self._status_pill(stage, accent),
-            content=ft.Column([ft.Column(rows, spacing=Space.LG), widgets.Divider(), bar], spacing=0),
+            content=ft.Column([ft.Column(rows, spacing=Space.LG), widgets.Divider(), progress_row], spacing=0),
         )
 
     @staticmethod
@@ -549,7 +549,7 @@ class LibrarySyncView(BaseView):
                 self.refresh()
             return handler
 
-        search = ft.TextField(
+        text_field = ft.TextField(
             value=self.state["scan_filter"],
             hint_text="Filter by path",
             hint_style=ft.TextStyle(size=12, color=p.text_faint),
@@ -568,7 +568,7 @@ class LibrarySyncView(BaseView):
             on_change=on_filter,
         )
 
-        status = ft.Container(
+        container = ft.Container(
             content=ft.Dropdown(
                 value=self.state["scan_status_filter"],
                 options=[ft.dropdown.Option(key, text) for key, text in STATUS_FILTERS],
@@ -587,8 +587,8 @@ class LibrarySyncView(BaseView):
         )
 
         controls = [
-            search,
-            status,
+            text_field,
+            container,
             widgets.IconButton(ft.Icons.UNFOLD_MORE_ROUNDED, "Expand all folders", set_folders(True)),
             widgets.IconButton(ft.Icons.UNFOLD_LESS_ROUNDED, "Collapse all folders", set_folders(False)),
         ]
@@ -619,22 +619,22 @@ class LibrarySyncView(BaseView):
                 selected.difference_update(keys)
             self.refresh()
 
-        caret = ft.Icon(
+        icon = ft.Icon(
             ft.Icons.EXPAND_MORE_ROUNDED if is_open else ft.Icons.CHEVRON_RIGHT_ROUNDED,
             size=18,
             color=p.text_muted,
         )
-        counter = ft.Text(f"{ticked} ticked" if tickable else "", size=11, color=fg)
-        self._refs[f"count_{group_key}"] = counter
+        text = ft.Text(f"{ticked} ticked" if tickable else "", size=11, color=fg)
+        self._refs[f"count_{group_key}"] = text
 
-        title = ft.Row(
+        row = ft.Row(
             [
-                caret,
+                icon,
                 ft.Text(heading, size=13, weight=ft.FontWeight.W_700, color=p.text),
                 widgets.Pill(str(len(rows)), tone_name),
                 ft.Text(description, size=11, color=p.text_muted, expand=True,
                         overflow=ft.TextOverflow.ELLIPSIS),
-                counter,
+                text,
             ],
             spacing=Space.MD,
             vertical_alignment=ft.CrossAxisAlignment.CENTER,
@@ -643,15 +643,15 @@ class LibrarySyncView(BaseView):
         if tickable and allow_all and not read_only:
             header_content = widgets.CheckRow(
                 None if 0 < ticked < len(rows) else ticked == len(rows),
-                ft.Container(content=title, on_click=toggle_open, expand=True),
+                ft.Container(content=row, on_click=toggle_open, expand=True),
                 on_change=toggle_all,
                 tristate=True,
             )
             self._refs[f"group_{group_key}"] = header_content.box
         else:
-            header_content = widgets.CheckSpacer(ft.Container(content=title, on_click=toggle_open, expand=True))
+            header_content = widgets.CheckSpacer(ft.Container(content=row, on_click=toggle_open, expand=True))
 
-        header = ft.Container(
+        container = ft.Container(
             content=header_content,
             padding=ft.padding.symmetric(horizontal=Space.MD, vertical=Space.SM),
             bgcolor=bg,
@@ -659,7 +659,7 @@ class LibrarySyncView(BaseView):
         )
 
         if not is_open:
-            return header
+            return container
 
         visible = self._visible(rows)
         body = []
@@ -689,7 +689,7 @@ class LibrarySyncView(BaseView):
             if len(shown) < len(visible):
                 body.append(self._show_all(len(visible) - len(shown)))
 
-        return ft.Column([header, ft.Column(body, spacing=0)], spacing=Space.SM)
+        return ft.Column([container, ft.Column(body, spacing=0)], spacing=Space.SM)
 
     # --- folder tree ---------------------------------------------------------
 
@@ -776,7 +776,7 @@ class LibrarySyncView(BaseView):
             folders[f"{group_key}|{path}"] = not is_open
             self.refresh()
 
-        content = ft.Container(
+        container = ft.Container(
             content=ft.Row(
                 [
                     ft.Icon(
@@ -804,13 +804,13 @@ class LibrarySyncView(BaseView):
         if tickable:
             row = widgets.CheckRow(
                 None if 0 < ticked < len(keys) else ticked == len(keys),
-                content,
+                container,
                 on_change=toggle_tick,
                 tristate=True,
             )
             self._refs.setdefault("nodes", []).append((group_key, row.box, keys))
         else:
-            row = widgets.CheckSpacer(content)
+            row = widgets.CheckSpacer(container)
 
         return ft.Container(
             content=row,
@@ -876,7 +876,7 @@ class LibrarySyncView(BaseView):
             else self._timestamps(change)
         )
 
-        content = ft.Row(
+        content_row = ft.Row(
             [
                 widgets.FileIcon(change["kind"], size=28),
                 ft.Text(name, size=13, weight=ft.FontWeight.W_600, color=p.text,
@@ -897,9 +897,9 @@ class LibrarySyncView(BaseView):
         )
 
         row = (
-            widgets.CheckRow(selected, content, on_change=on_toggle)
+            widgets.CheckRow(selected, content_row, on_change=on_toggle)
             if tickable
-            else widgets.CheckSpacer(content)
+            else widgets.CheckSpacer(content_row)
         )
 
         def on_hover(e):
@@ -935,34 +935,34 @@ class LibrarySyncView(BaseView):
         """
         selected = self.state["scan_selected"]
 
-        for node_group, box, keys in self._refs.get("nodes", []):
+        for node_group, checkbox, keys in self._refs.get("nodes", []):
             if node_group != group_key:
                 continue
             ticked = len(keys & selected)
-            box.value = None if 0 < ticked < len(keys) else ticked == len(keys)
-            box.update()
+            checkbox.value = None if 0 < ticked < len(keys) else ticked == len(keys)
+            checkbox.update()
 
         rows = self._in_group(group_key)
         ticked = sum(1 for row in rows if row["key"] in selected)
 
-        counter = self._refs.get(f"count_{group_key}")
-        if counter is not None:
-            counter.value = f"{ticked} ticked"
-            counter.update()
+        text = self._refs.get(f"count_{group_key}")
+        if text is not None:
+            text.value = f"{ticked} ticked"
+            text.update()
 
-        box = self._refs.get(f"group_{group_key}")
-        if box is not None:
-            box.value = None if 0 < ticked < len(rows) else ticked == len(rows)
-            box.update()
+        checkbox = self._refs.get(f"group_{group_key}")
+        if checkbox is not None:
+            checkbox.value = None if 0 < ticked < len(rows) else ticked == len(rows)
+            checkbox.update()
 
     def _relabel_run_button(self):
-        button = self._refs.get("run")
-        if button is None:
+        filled_button = self._refs.get("run")
+        if filled_button is None:
             return
         selected = len(self.state["scan_selected"])
-        button.text = self._run_label(selected)
-        button.disabled = selected == 0
-        button.update()
+        filled_button.text = self._run_label(selected)
+        filled_button.disabled = selected == 0
+        filled_button.update()
 
     # --- sync side panel -----------------------------------------------------
 
@@ -1195,7 +1195,7 @@ class LibrarySyncView(BaseView):
             if (e.control.value.strip() == CONFIRM_WORD) != was_armed:
                 self.refresh()
 
-        field = ft.TextField(
+        text_field = ft.TextField(
             value=typed,
             hint_text=f"Type {CONFIRM_WORD} to enable",
             hint_style=ft.TextStyle(size=12, color=p.text_faint),
@@ -1219,7 +1219,7 @@ class LibrarySyncView(BaseView):
                             ft.Icons.LOCK_OPEN_ROUNDED if armed else ft.Icons.LOCK_OUTLINE_ROUNDED),
             content=ft.Column(
                 [
-                    field,
+                    text_field,
                     widgets.Divider(bottom=Space.MD),
                     widgets.KvRow("Files to convert", data.STATS["source_files"]),
                     widgets.KvRow("Estimated duration", "~5 min"),
@@ -1233,7 +1233,7 @@ class LibrarySyncView(BaseView):
     def _open_dialog(self):
         p = self.p
 
-        dialog = ft.AlertDialog(
+        alert_dialog = ft.AlertDialog(
             modal=True,
             bgcolor=p.surface,
             shape=ft.RoundedRectangleBorder(radius=Radius.LG),
@@ -1255,19 +1255,19 @@ class LibrarySyncView(BaseView):
                 width=360,
             ),
             actions=[
-                widgets.GhostButton("Cancel", on_click=lambda _: self.page.close(dialog)),
+                widgets.GhostButton("Cancel", on_click=lambda _: self.page.close(alert_dialog)),
                 widgets.PrimaryButton(
                     "Yes, reset",
                     tone_name="danger",
-                    on_click=lambda _: self._confirmed(dialog),
+                    on_click=lambda _: self._confirmed(alert_dialog),
                 ),
             ],
             actions_alignment=ft.MainAxisAlignment.END,
         )
-        self.page.open(dialog)
+        self.page.open(alert_dialog)
 
-    def _confirmed(self, dialog):
-        self.page.close(dialog)
+    def _confirmed(self, alert_dialog):
+        self.page.close(alert_dialog)
         # TODO: wire to FileConverterService.start_convert_files() then
         # TextEmbedderService.reset_collection() + embed_collection()
         self.not_implemented("Reset library")

@@ -86,7 +86,7 @@ class SearchView(BaseView):
 
         # The height sits on the box below, not on the field: a forced height
         # here renders the input decoration at the top of its box.
-        field = ft.TextField(
+        text_field = ft.TextField(
             value=self.state["query"],
             hint_text="Ask for a note or a command ...",
             hint_style=ft.TextStyle(size=13, color=p.text_faint),
@@ -100,14 +100,14 @@ class SearchView(BaseView):
             on_submit=lambda e: self.portal.search(e.control.value),
         )
 
-        controls = [field]
+        controls = [text_field]
         if self.state["query"]:
             controls.append(
                 widgets.IconButton(ft.Icons.CLOSE_ROUNDED, "Clear", lambda _: self.portal.clear())
             )
 
         # `expand` so the field takes whatever the button leaves on the line.
-        box = ft.Container(
+        container = ft.Container(
             content=ft.Row(controls, spacing=Space.XS,
                            vertical_alignment=ft.CrossAxisAlignment.CENTER),
             bgcolor=p.surface,
@@ -121,11 +121,11 @@ class SearchView(BaseView):
         return ft.Container(
             content=ft.Row(
                 [
-                    box,
+                    container,
                     widgets.PrimaryIconButton(
                         ft.Icons.SEARCH_ROUNDED,
                         "Search",
-                        lambda _: self.portal.search(field.value),
+                        lambda _: self.portal.search(text_field.value),
                         size=self.SEARCH_BUTTON,
                     ),
                 ],
@@ -397,7 +397,7 @@ class SearchView(BaseView):
         p = self.p
         blocks = data.FILE_CONTENT.get(result["id"], [])
 
-        heading = ft.Row(
+        row = ft.Row(
             [
                 ft.Container(content=widgets.Label("File content"), expand=True),
                 widgets.Pill(
@@ -425,7 +425,7 @@ class SearchView(BaseView):
         return widgets.Card(
             ft.Column(
                 [
-                    heading,
+                    row,
                     ft.Container(height=Space.MD),
                     ft.Container(
                         content=ft.Column(body, spacing=0, scroll=ft.ScrollMode.AUTO),
@@ -527,7 +527,7 @@ class SearchView(BaseView):
             return ft.Container(width=width, height=height, bgcolor=p.surface_high,
                                 border_radius=Radius.SM)
 
-        header = widgets.Card(
+        card = widgets.Card(
             ft.Row(
                 [
                     ft.Container(width=30, height=30, bgcolor=p.surface_high,
@@ -553,7 +553,7 @@ class SearchView(BaseView):
 
         return ft.Column(
             [
-                header,
+                card,
                 widgets.Card(ft.Column(lines, spacing=0, expand=True), radius=0, border=None,
                              padding=Space.MD, expand=True),
             ],

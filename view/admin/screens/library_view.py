@@ -96,7 +96,7 @@ class LibraryView(BaseView):
                 self.refresh()
             return handler
 
-        search = ft.TextField(
+        text_field = ft.TextField(
             value=self.state["library_filter"],
             hint_text="Filter by path or id",
             hint_style=ft.TextStyle(size=12, color=p.text_faint),
@@ -117,7 +117,7 @@ class LibraryView(BaseView):
 
         return ft.Row(
             [
-                search,
+                text_field,
                 widgets.IconButton(ft.Icons.UNFOLD_MORE_ROUNDED, "Expand all folders", set_folders(True)),
                 widgets.IconButton(ft.Icons.UNFOLD_LESS_ROUNDED, "Collapse all folders", set_folders(False)),
             ],
@@ -132,7 +132,7 @@ class LibraryView(BaseView):
                 "Try a shorter path fragment, or clear the filter to list everything.",
             )
 
-        header = ft.Container(
+        container = ft.Container(
             content=ft.Row(
                 [
                     ft.Container(content=widgets.Label("Name"), expand=True),
@@ -149,7 +149,7 @@ class LibraryView(BaseView):
         # outside the scrolling column, so they stay pinned to the card.
         return ft.Column(
             [
-                header,
+                container,
                 ft.Container(height=1, bgcolor=self.p.border_soft),
                 ft.Column(self._tree_rows(tree), spacing=0, scroll=ft.ScrollMode.AUTO, expand=True),
             ],
