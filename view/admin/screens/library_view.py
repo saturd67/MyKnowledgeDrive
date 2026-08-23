@@ -12,7 +12,9 @@ from constant.settings import EMBEDDING_COLLECTION
 from services.SettingService import settingService
 from view import mock_data as data
 from view import widgets
+from view.admin.admin_state import AdminState
 from view.base_view import BaseView
+from view.protocols.portal import Portal
 from view.theme import Radius, Space
 
 # How far each folder level is pushed in.
@@ -30,6 +32,8 @@ def _kind_tone(kind):
 
 
 class LibraryView(BaseView):
+
+    portal: Portal[AdminState]
 
     # The tree carries the only scrollbar on this screen - the heading, the
     # stat cards and the column header stay put while the rows move.
@@ -78,7 +82,7 @@ class LibraryView(BaseView):
         )
 
     def _filtered(self):
-        needle = self.portal.state["library_filter"].strip().lower()
+        needle = self.portal.state.library_filter.strip().lower()
         if not needle:
             return data.DOCUMENTS
         return [d for d in data.DOCUMENTS if needle in d[1].lower() or needle in d[0].lower()]
@@ -87,17 +91,17 @@ class LibraryView(BaseView):
         p = self.p
 
         def on_filter(e):
-            self.portal.state["library_filter"] = e.control.value
+            self.portal.state.library_filter = e.control.value
             self.portal.refresh()
 
         def set_folders(is_open):
             def handler(_):
-                self.portal.state["library_folders_open"] = {path: is_open for path in self._folder_ids()}
+                self.portal.state.library_folders_open = {path: is_open for path in self._folder_ids()}
                 self.portal.refresh()
             return handler
 
         text_field = ft.TextField(
-            value=self.portal.state["library_filter"],
+            value=self.portal.state.library_filter,
             hint_text="Filter by path or id",
             hint_style=ft.TextStyle(size=12, color=p.text_faint),
             prefix_icon=ft.Icons.SEARCH_ROUNDED,
@@ -196,9 +200,9 @@ class LibraryView(BaseView):
         """Folders start closed, so the screen opens on the top-level folders
         alone and you drill in from there. A filter opens everything - a hit is
         no use hidden - and an explicit click otherwise always wins."""
-        if self.portal.state["library_filter"].strip():
+        if self.portal.state.library_filter.strip():
             return True
-        return self.portal.state["library_folders_open"].get(path, False)
+        return self.portal.state.library_folders_open.get(path, False)
 
     @staticmethod
     def _folder_ids():
@@ -237,7 +241,7 @@ class LibraryView(BaseView):
         p = self.p
 
         def toggle_open(_):
-            self.portal.state["library_folders_open"][path] = not is_open
+            self.portal.state.library_folders_open[path] = not is_open
             self.portal.refresh()
 
         return ft.Container(

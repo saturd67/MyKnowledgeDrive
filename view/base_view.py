@@ -12,13 +12,18 @@ methods; the shell only ever calls `ViewClass(portal).build()`.
 Whatever a screen needs from its shell - the page, the state, a refresh, a
 notice - it asks `self.portal` for by name. There are no passthroughs here,
 so reading a screen tells you which of them it actually leans on.
+
+Which shell that is deliberately has no type here: the screens do not all
+want the same one. Each subclass declares its own `portal` field with the
+protocol it needs - `Portal[AdminState]` for the admin screens,
+`SearchPortal` for the search screen - and that is what the editor reads
+`portal.state` off.
 """
 
 from abc import ABC, abstractmethod
 
 import flet as ft
 
-from view.protocols.portal import Portal
 from view.theme import palette
 
 
@@ -29,7 +34,7 @@ class BaseView(ABC):
     # keeps its scrollbar inside that list.
     scrolls = True
 
-    def __init__(self, portal: Portal):
+    def __init__(self, portal):
         self.portal = portal
         # Light mode only, and the instance is thrown away after one build,
         # so reading the tokens once here is enough.

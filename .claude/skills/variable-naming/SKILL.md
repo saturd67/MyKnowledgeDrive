@@ -59,10 +59,10 @@ A variable or parameter that holds a `True`/`False` value starts with `is`:
 
 ```python
 is_open = self._folder_open(path)
-is_selected = index == self.state["selected"]
-is_busy = self.state["sync_stage"] in ("scanning", "updating")
+is_selected = index == self.state.selected_index
+is_busy = self.state.sync_stage in ("scanning", "updating")
 is_armed = typed.strip() == CONFIRM_WORD
-is_read_only = self.state["sync_stage"] != "reviewing"
+is_read_only = self.state.sync_stage != "reviewing"
 ```
 
 Don't use a bare adjective/participle (`busy`, `armed`, `active`,
@@ -77,8 +77,8 @@ unambiguously as true/false at the call site.
   these parameter names are Flet's (or another library's) own signature,
   not ours to rename.
 - **A name that is only sometimes boolean stays untouched, or gets split.**
-  e.g. `selected = len(self.state["scan_selected"])` (an int) and
-  `selected = self.state["scan_selected"]` (a set) are not booleans at
+  e.g. `selected = len(self.state.scan_selected)` (an int) and
+  `selected = self.state.scan_selected` (a set) are not booleans at
   all - only rename the specific occurrences that actually hold a
   `True`/`False` value.
 

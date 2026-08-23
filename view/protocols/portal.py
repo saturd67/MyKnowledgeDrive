@@ -15,16 +15,23 @@ from typing import Protocol, runtime_checkable
 
 import flet as ft
 
+from view.portal_state import StateT
+from view.user.user_state import UserState
+
 
 @runtime_checkable
-class Portal(Protocol):
-    """What every screen may rely on."""
+class Portal(Protocol[StateT]):
+    """What every screen may rely on.
+
+    Written against the state it carries, so a screen declares the portal it
+    expects - `Portal[AdminState]` - and reads `state.sync_mode` off it.
+    """
 
     #: The Flet page the portal is rendered onto.
     page: ft.Page
 
-    #: Screen state that survives navigation - each screen owns its own keys.
-    state: dict
+    #: Screen state that survives navigation - each screen owns its own fields.
+    state: StateT
 
     def render(self) -> None:
         """Rebuild the whole window, chrome included."""
@@ -44,7 +51,7 @@ class Portal(Protocol):
 
 
 @runtime_checkable
-class SearchPortal(Portal, Protocol):
+class SearchPortal(Portal[UserState], Protocol):
     """The user portal, which also owns the query itself."""
 
     def search(self, query: str) -> None:

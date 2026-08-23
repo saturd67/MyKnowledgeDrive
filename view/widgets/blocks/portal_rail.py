@@ -65,10 +65,10 @@ class PortalRail(ft.Container):
         would cycle.
         """
         if portal == "admin":
-            from view.admin.shell import AdminPortal
+            from view.admin.admin_portal import AdminPortal
             AdminPortal(page).start(set_window=set_window)
         else:
-            from view.user.shell import UserPortal
+            from view.user.user_portal import UserPortal
             UserPortal(page).start(set_window=set_window)
 
     @staticmethod

@@ -42,7 +42,7 @@ class SearchView(BaseView):
         Returned without a padding frame - the pane runs to the window edges,
         so every branch below fills the space the shell gives it.
         """
-        mode = self.portal.state["mode"]
+        mode = self.portal.state.mode
 
         if mode == "results":
             content = self._file_pane(self.result())
@@ -52,7 +52,7 @@ class SearchView(BaseView):
             content = self._notice(
                 ft.Icons.SEARCH_OFF_ROUNDED,
                 "Nothing close enough",
-                f'No file matched "{self.portal.state["query"]}". Try different wording, or run a '
+                f'No file matched "{self.portal.state.query}". Try different wording, or run a '
                 "sync in the admin portal if the note is new.",
             )
         else:
@@ -87,7 +87,7 @@ class SearchView(BaseView):
         # The height sits on the box below, not on the field: a forced height
         # here renders the input decoration at the top of its box.
         text_field = ft.TextField(
-            value=self.portal.state["query"],
+            value=self.portal.state.query,
             hint_text="Ask for a note or a command ...",
             hint_style=ft.TextStyle(size=13, color=p.text_faint),
             text_size=13,
@@ -101,7 +101,7 @@ class SearchView(BaseView):
         )
 
         controls = [text_field]
-        if self.portal.state["query"]:
+        if self.portal.state.query:
             controls.append(
                 widgets.IconButton(ft.Icons.CLOSE_ROUNDED, "Clear", lambda _: self.portal.clear())
             )
@@ -137,7 +137,7 @@ class SearchView(BaseView):
 
     def _results_header(self):
         p = self.p
-        mode = self.portal.state["mode"]
+        mode = self.portal.state.mode
         results = self.results()
 
         if mode == "results":
@@ -161,7 +161,7 @@ class SearchView(BaseView):
         )
 
     def _results_list(self):
-        mode = self.portal.state["mode"]
+        mode = self.portal.state.mode
 
         if mode == "searching":
             body = ft.Column([self._hit_skeleton() for _ in range(4)], spacing=Space.XS)
@@ -195,12 +195,12 @@ class SearchView(BaseView):
     def _hit(self, index, result):
         """One ranked file: position, name, folder and how close it scored."""
         p = self.p
-        selected = index == self.portal.state["selected"]
+        is_selected = index == self.portal.state.selected_index
         folder, _, name = result["label"].rpartition("\\")
         score = self._score(result["distance"])
 
         def on_click(_):
-            self.portal.state["selected"] = index
+            self.portal.state.selected_index = index
             self.portal.refresh()
 
         return widgets.Hoverable(
@@ -208,7 +208,7 @@ class SearchView(BaseView):
                 [
                     ft.Container(
                         content=ft.Text(str(index + 1), size=11, weight=ft.FontWeight.W_700,
-                                        color=p.primary if selected else p.text_faint),
+                                        color=p.primary if is_selected else p.text_faint),
                         width=12,
                     ),
                     widgets.FileIcon(result["kind"], size=32),
@@ -247,7 +247,7 @@ class SearchView(BaseView):
             ),
             padding=ft.padding.symmetric(horizontal=Space.SM, vertical=Space.SM),
             on_click=on_click,
-            selected=selected,
+            selected=is_selected,
             bordered=False,
         )
 
@@ -571,7 +571,7 @@ class SearchView(BaseView):
     def result(self):
         """The hit the reading pane is showing."""
         results = self.results()
-        index = min(self.portal.state["selected"], len(results) - 1)
+        index = min(self.portal.state.selected_index, len(results) - 1)
         return results[index]
 
     @staticmethod

@@ -7,6 +7,7 @@ import flet as ft
 
 from view import theme
 from view import widgets
+from view.admin.admin_state import AdminState
 from view.admin.screens.library_sync_view import LibrarySyncView
 from view.admin.screens.library_view import LibraryView
 from view.admin.screens.settings_view import SettingsView
@@ -23,6 +24,8 @@ NAV_ITEMS = [
 
 class AdminPortal(BasePortal):
 
+    state: AdminState
+
     title = "MyKnowledgeDrive - Admin Portal"
 
     def __init__(self, page):
@@ -30,40 +33,7 @@ class AdminPortal(BasePortal):
         self.index = 0
 
     def initial_state(self):
-        return {
-            "library_filter": "",
-            # Folder path -> bool. Absent means closed, so only the folders you
-            # actually opened are tracked.
-            "library_folders_open": {},
-            "sync_mode": "sync",     # sync | reset
-            # idle -> scanning -> reviewing -> updating -> done
-            "sync_stage": "idle",
-            "reset_confirm": "",
-            "settings_edits": {},    # key -> unsaved value
-
-            # Sync review: the scan result and what is ticked for updating.
-            "scan_changes": [],
-            "scan_selected": set(),
-            "scan_filter": "",
-            "scan_status_filter": "all",
-            "scan_groups_open": {
-                "add": True,
-                "update": True,
-                "remove": True,
-                "blocked": False,
-                "unchanged": False,
-            },
-            # "<group>|<folder path>" -> bool. Absent means the group default,
-            # so only folders you actually clicked are tracked.
-            "scan_folders_open": {},
-            "scan_show_all_unchanged": False,
-            "scan_stats": None,
-            "sync_log": [],          # (hh:mm:ss, LEVEL, message)
-            "sync_progress": None,   # (caption, 0..1 or None)
-            "sync_result": None,     # counts from the last apply
-            "sync_error": None,
-            "sync_cancel": False,
-        }
+        return AdminState()
 
     # --- lifecycle ----------------------------------------------------------
 
@@ -92,7 +62,7 @@ class AdminPortal(BasePortal):
     def navigate(self, index):
         self.index = index
         # A message belongs to the screen that raised it.
-        self.state["notice"] = None
+        self.state.notice = None
         self.render()
 
     # --- layout --------------------------------------------------------------

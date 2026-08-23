@@ -16,6 +16,7 @@ import flet as ft
 
 from view import theme
 from view import widgets
+from view.portal_state import PortalState
 from view.theme import Space
 
 
@@ -32,17 +33,17 @@ class BasePortal(ABC):
 
     def __init__(self, page: ft.Page):
         self.page = page
-        self.state = {
-            # (message, tone name) for the banner above the screen, or None.
-            "notice": None,
-            **self.initial_state(),
-        }
+        self.state = self.initial_state()
         self._body = ft.Container(expand=True)
         self._notice = ft.Container()
 
     @abstractmethod
-    def initial_state(self) -> dict:
-        """Return the screen state this portal starts with - its own keys only."""
+    def initial_state(self) -> PortalState:
+        """Return the state this portal starts with.
+
+        A `PortalState` subclass carrying the fields this portal's screens
+        read and write - see `view/portal_state.py`.
+        """
         raise NotImplementedError
 
     # --- lifecycle ----------------------------------------------------------
@@ -74,12 +75,12 @@ class BasePortal(ABC):
 
     def show_notice_bar(self, message: str, tone_name: str = "neutral") -> None:
         """Show a banner above the screen. It stays until it is dismissed."""
-        self.state["notice"] = (message, tone_name)
+        self.state.notice = (message, tone_name)
         self._fill_notice()
         self._notice.update()
 
     def hide_notice_bar(self, _=None) -> None:
-        self.state["notice"] = None
+        self.state.notice = None
         self._fill_notice()
         self._notice.update()
 
@@ -92,7 +93,7 @@ class BasePortal(ABC):
 
     def _fill_notice(self) -> None:
         """Put the state of `notice` into the slot. Collapsed when there is none."""
-        notice = self.state["notice"]
+        notice = self.state.notice
         if notice is None:
             self._notice.content = None
             self._notice.padding = 0

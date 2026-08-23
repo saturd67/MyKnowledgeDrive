@@ -1,6 +1,6 @@
 """Settings: the rows of the setting table, edited in place.
 
-Unsaved edits live in portal.state["settings_edits"] so switching screens does
+Unsaved edits live in portal.state.settings_edits so switching screens does
 not lose them; Save writes the section's changed keys in one transaction and
 Revert just drops them.
 """
@@ -21,7 +21,9 @@ from constant.settings import (
 )
 from services.SettingService import settingService
 from view import widgets
+from view.admin.admin_state import AdminState
 from view.base_view import BaseView
+from view.protocols.portal import Portal
 from view.theme import Radius, Space
 
 PATH_KEYS = (PATHS_INPUT_DIR, PATHS_OUTPUT_DIR, PATHS_CHROMA_STORE)
@@ -42,6 +44,8 @@ DESTRUCTIVE_KEYS = (PATHS_OUTPUT_DIR, EMBEDDING_COLLECTION)
 
 
 class SettingsView(BaseView):
+
+    portal: Portal[AdminState]
 
     def build(self):
         values = self._values()
@@ -83,11 +87,11 @@ class SettingsView(BaseView):
     def _values(self):
         """Saved values with any unsaved edits laid over the top."""
         values = dict(settingService.get_all())
-        values.update(self.portal.state["settings_edits"])
+        values.update(self.portal.state.settings_edits)
         return values
 
     def _pending(self, keys):
-        edits = self.portal.state["settings_edits"]
+        edits = self.portal.state.settings_edits
         return {key: edits[key] for key in keys if key in edits}
 
     @staticmethod
@@ -121,7 +125,7 @@ class SettingsView(BaseView):
             return
 
         for key in edits:
-            self.portal.state["settings_edits"].pop(key, None)
+            self.portal.state.settings_edits.pop(key, None)
 
         if any(key in DESTRUCTIVE_KEYS for key in edits):
             self.portal.show_notice_bar(
@@ -137,7 +141,7 @@ class SettingsView(BaseView):
         if not self._pending(keys):
             return
         for key in keys:
-            self.portal.state["settings_edits"].pop(key, None)
+            self.portal.state.settings_edits.pop(key, None)
         self.portal.show_notice_bar(f"Reverted {what}.", "neutral")
         self.portal.refresh()
 
@@ -154,7 +158,7 @@ class SettingsView(BaseView):
         def on_change(e):
             # Held until Save - rebuilding the screen on every keystroke would
             # drop focus out of the field.
-            self.portal.state["settings_edits"][key] = e.control.value
+            self.portal.state.settings_edits[key] = e.control.value
 
         return widgets.EditableRow(
             LABELS[key],

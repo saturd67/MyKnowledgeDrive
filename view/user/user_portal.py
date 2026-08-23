@@ -10,9 +10,12 @@ from view import widgets
 from view.base_portal import BasePortal
 from view.theme import Space, palette
 from view.user.screens.search_view import SearchView
+from view.user.user_state import UserState
 
 
 class UserPortal(BasePortal):
+
+    state: UserState
 
     title = "MyKnowledgeDrive - User Portal"
 
@@ -27,11 +30,7 @@ class UserPortal(BasePortal):
         self._panel = ft.Container()
 
     def initial_state(self):
-        return {
-            "query": "",
-            "mode": "hero",      # hero | searching | results | empty
-            "selected": 0,
-        }
+        return UserState()
 
     # --- lifecycle ----------------------------------------------------------
 
@@ -78,12 +77,12 @@ class UserPortal(BasePortal):
     # --- helpers available to the screen -------------------------------------
 
     def search(self, query):
-        self.state["query"] = query
-        self.state["selected"] = 0
-        self.state["mode"] = "results" if query.strip() else "hero"
+        self.state.query = query
+        self.state.selected_index = 0
+        self.state.mode = "results" if query.strip() else "hero"
         self.refresh()
 
     def clear(self):
-        self.state["query"] = ""
-        self.state["mode"] = "hero"
+        self.state.query = ""
+        self.state.mode = "hero"
         self.refresh()
