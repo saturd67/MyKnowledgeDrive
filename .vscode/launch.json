@@ -1,0 +1,12 @@
+{
+    "version": "0.2.0",
+    "configurations": [
+        {
+            "name": "Run Python",
+            "type": "debugpy",
+            "request": "launch",
+            "program": "C:\\Users\\cheah\\Desktop\\Apps\\MyKnowledgeDrive\\main.py",
+            "console": "integratedTerminal"
+        }
+    ]
+}
