@@ -15,7 +15,7 @@ import time
 
 import flet as ft
 
-from constant.settings import EMBEDDING_COLLECTION, EMBEDDING_MODEL
+from constant.settings import EMBEDDING_MODEL
 from services.SettingService import settingService
 from view import mock_data as data
 from view import widgets
@@ -156,35 +156,15 @@ class LibrarySyncView(BaseView):
 
         if stage in ("idle", "scanning"):
             children += [
-                ft.Row(
-                    [
-                        ft.Container(
-                            content=self._steps(SCAN_STAGES, "primary", "Scan steps",
-                                                "What a scan looks at, in order. Nothing is written."),
-                            expand=3,
-                        ),
-                        ft.Container(content=self._summary(), expand=2),
-                    ],
-                    spacing=Space.LG,
-                    vertical_alignment=ft.CrossAxisAlignment.START,
-                ),
+                self._steps(SCAN_STAGES, "primary", "Scan steps",
+                            "What a scan looks at, in order. Nothing is written."),
                 ft.Container(height=Space.LG),
             ]
         else:
             if stage == "updating":
                 children += [
-                    ft.Row(
-                        [
-                            ft.Container(
-                                content=self._steps(APPLY_STAGES, "primary", "Update steps",
-                                                    "What happens to the files you picked."),
-                                expand=3,
-                            ),
-                            ft.Container(content=self._summary(), expand=2),
-                        ],
-                        spacing=Space.LG,
-                        vertical_alignment=ft.CrossAxisAlignment.START,
-                    ),
+                    self._steps(APPLY_STAGES, "primary", "Update steps",
+                                "What happens to the files you picked."),
                     ft.Container(height=Space.LG),
                 ]
             else:
@@ -969,55 +949,6 @@ class LibrarySyncView(BaseView):
         filled_button.text = self._run_label(selected)
         filled_button.disabled = selected == 0
         filled_button.update()
-
-    # --- sync side panel -----------------------------------------------------
-
-    def _summary(self):
-        stage = self.portal.state.sync_stage
-
-        if stage == "idle":
-            return widgets.Section(
-                "Last run summary",
-                "Result of the previous run.",
-                content=widgets.EmptyState(
-                    ft.Icons.HISTORY_ROUNDED,
-                    "No run in this session",
-                    "Scan to see which files are new, changed or gone from Drive.",
-                    height=220,
-                ),
-            )
-
-        if stage == "scanning":
-            return widgets.Section(
-                "Scanning",
-                "Nothing is written while a scan runs.",
-                content=ft.Column(
-                    [
-                        widgets.KvRow("Input", "resources\\files"),
-                        widgets.KvRow("Collection", settingService.get(EMBEDDING_COLLECTION), is_mono=True),
-                        widgets.Divider(bottom=Space.MD),
-                        widgets.KvRow("Reads", "source mtimes, Drive listing, collection metadata"),
-                        widgets.KvRow("Writes", "nothing"),
-                    ],
-                    spacing=Space.MD,
-                ),
-            )
-
-        selected = len(self.portal.state.scan_selected)
-        return widgets.Section(
-            "This run",
-            "Only the ticked files are touched.",
-            content=ft.Column(
-                [
-                    widgets.KvRow("Selected", str(selected)),
-                    widgets.KvRow("Collection", settingService.get(EMBEDDING_COLLECTION), is_mono=True),
-                    widgets.KvRow("Embedding model", settingService.get(EMBEDDING_MODEL), is_mono=True),
-                    widgets.Divider(bottom=Space.MD),
-                    widgets.KvRow("Cancel", "Stops after the current file"),
-                ],
-                spacing=Space.MD,
-            ),
-        )
 
     # --- runs (scripted for now) ---------------------------------------------
 
