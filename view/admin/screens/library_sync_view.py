@@ -90,6 +90,10 @@ REMOVE_WARN_RATIO = 0.2
 # How far each folder level is pushed in.
 INDENT = 22
 
+# Height of one step card in the horizontal pipeline list. Fixed so the four
+# cards agree along the bottom whatever their text runs to.
+STEP_CARD_HEIGHT = 132
+
 SCAN_SCRIPT = [
     ("INFO", "Walking resources\\files"),
     ("INFO", "Comparing source mtimes against converted_files"),
@@ -321,6 +325,12 @@ class LibrarySyncView(BaseView):
             fraction = progress[1] if progress else 0.0
             active_index = min(int(fraction * len(stages)), len(stages) - 1)
 
+        # A 12-column grid split between the steps, with breakpoints so they
+        # wrap rather than run off the side. A plain Row with expanded children
+        # sizes each card to its own text, which overflows on a narrow window
+        # and simply clips the last step.
+        span = {"xs": 12, "md": 6, "xl": 12 / len(stages)}
+
         cards = []
         for index, (name, step_description) in enumerate(stages):
             if index < active_index:
@@ -331,7 +341,7 @@ class LibrarySyncView(BaseView):
                 icon, tone_name = ft.Icons.RADIO_BUTTON_UNCHECKED_ROUNDED, "neutral"
 
             cards.append(self._step_card(index, name, step_description, icon, tone_name,
-                                         active_index))
+                                         active_index, span))
 
         return widgets.Section(
             heading,
@@ -339,11 +349,11 @@ class LibrarySyncView(BaseView):
             trailing=self._status_pill(stage, accent),
             # Equal columns rather than a stack: the steps run left to right,
             # so the whole pipeline is one line to read across.
-            content=ft.Row(cards, spacing=Space.MD,
-                           vertical_alignment=ft.CrossAxisAlignment.STRETCH),
+            content=ft.ResponsiveRow(cards, spacing=Space.MD, run_spacing=Space.MD,
+                                     vertical_alignment=ft.CrossAxisAlignment.START),
         )
 
-    def _step_card(self, index, name, description, icon, tone_name, active_index):
+    def _step_card(self, index, name, description, icon, tone_name, active_index, span):
         """One step, as a column in the horizontal list."""
         p = self.p
         fg, bg = tone(tone_name)
@@ -367,16 +377,21 @@ class LibrarySyncView(BaseView):
                         vertical_alignment=ft.CrossAxisAlignment.CENTER,
                     ),
                     ft.Container(height=Space.XS),
-                    ft.Text(name, size=13, weight=ft.FontWeight.W_600, color=p.text),
-                    ft.Text(description, size=11, color=p.text_muted),
+                    ft.Text(name, size=13, weight=ft.FontWeight.W_600, color=p.text,
+                            max_lines=2, overflow=ft.TextOverflow.ELLIPSIS),
+                    ft.Text(description, size=11, color=p.text_muted,
+                            max_lines=3, overflow=ft.TextOverflow.ELLIPSIS),
                 ],
                 spacing=2,
             ),
             padding=Space.MD,
+            # Fixed, so four cards of differing text still line up along the
+            # bottom. The two Texts above are capped to match.
+            height=STEP_CARD_HEIGHT,
             bgcolor=bg if is_active else p.surface_alt,
             border=ft.border.all(1, fg if is_active else p.border_soft),
             border_radius=Radius.MD,
-            expand=True,
+            col=span,
         )
 
     @staticmethod
