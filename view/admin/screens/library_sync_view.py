@@ -44,6 +44,7 @@ APPLY_STAGES = [
 ]
 
 RESET_STAGES = [
+    ("Download from Drive", "Every supported file in the Drive folder is re-downloaded to resources\\files."),
     ("Clear converted files", "resources\\converted_files is deleted and recreated."),
     ("Convert every source file", "Each .docx and image is OCR'd again from scratch."),
     ("Drop the collection", "The Chroma collection is deleted and recreated."),
