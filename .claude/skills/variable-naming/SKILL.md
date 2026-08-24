@@ -1,6 +1,6 @@
 ---
 name: variable-naming
-description: Use when writing or reviewing any Python code in this project - covers two rules - (1) a local variable holding a single class instance is named after that class, in snake_case, and (2) a boolean variable's name always starts with 'is'. Applies everywhere (view/ widgets and screens, services/, repository/, components/). Triggers on introducing a new local var assigned from a class constructor or a boolean expression, or noticing an existing generically-named one nearby (field, box, view, header, selected, busy, armed, active, read_only, heavy).
+description: Use when writing or reviewing any Python code in this project - covers three rules - (1) a local variable holding a single class instance is named after that class, in snake_case, (2) a boolean variable's name always starts with 'is', and (3) a counter's name ends with 'count' and says what it counts (downloaded_file_count). Applies everywhere (view/ widgets and screens, services/, repository/, components/). Triggers on introducing a new local var assigned from a class constructor, a boolean expression, or a running total, or noticing an existing generically-named one nearby (field, box, view, header, selected, busy, armed, active, read_only, heavy, count, total, downloaded, skipped, failed).
 ---
 
 # Variable naming
@@ -82,10 +82,46 @@ unambiguously as true/false at the call site.
   all - only rename the specific occurrences that actually hold a
   `True`/`False` value.
 
+## 3. Counters - end with `count`, and say what is counted
+
+A variable that holds a running total ends with `count`, and names the
+thing it counts:
+
+```python
+downloaded_file_count = 0
+skipped_file_count = 0
+failed_file_count = 0
+converted_file_count, skipped_file_count = self._sync_file(input_dir)
+```
+
+Don't use the bare participle or adjective on its own (`downloaded`,
+`skipped`, `failed`, `converted`, `total`) - on its own it reads like a
+boolean or like the thing itself rather than how many of them there are.
+
+### On accumulating from a nested call
+
+When a recursive or nested call returns counts that are added to the
+running ones, prefix the returned names rather than shortening them:
+
+```python
+sub_downloaded_file_count, sub_skipped_file_count = self._download_files_in_folder(...)
+downloaded_file_count += sub_downloaded_file_count
+skipped_file_count += sub_skipped_file_count
+```
+
+### Exceptions
+
+- **A loop index is not a count.** `index`, or the `index` from
+  `enumerate(...)`, stays as it is.
+- **A length read once and used inline** keeps a descriptive name if it is
+  not a running total - `total_img = len(soup.find_all('img'))` is a
+  count, and would be `image_count`; `len(files)` used directly in an
+  f-string needs no variable at all.
+
 ## Where this applies
 
 Project-wide - `view/` (shells, screens, widgets), `services/`,
 `repository/`, `components/`, and anywhere else a variable is assigned a
-class instance or a boolean value. Apply both rules when introducing new
-local variables and when touching nearby code that still uses the old
-style.
+class instance, a boolean value, or a count. Apply all three rules when
+introducing new local variables and when touching nearby code that still
+uses the old style.
