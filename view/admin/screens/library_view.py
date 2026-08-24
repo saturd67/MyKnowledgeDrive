@@ -88,8 +88,6 @@ class LibraryView(BaseView):
         return [d for d in data.DOCUMENTS if needle in d[1].lower() or needle in d[0].lower()]
 
     def _toolbar(self):
-        p = self.p
-
         def on_filter(e):
             self.portal.state.library_filter = e.control.value
             self.portal.refresh()
@@ -100,28 +98,17 @@ class LibraryView(BaseView):
                 self.portal.refresh()
             return handler
 
-        text_field = ft.TextField(
+        text_input = widgets.TextInput(
+            ft.Icons.SEARCH_ROUNDED,
+            "Filter by path or id",
             value=self.portal.state.library_filter,
-            hint_text="Filter by path or id",
-            hint_style=ft.TextStyle(size=12, color=p.text_faint),
-            prefix_icon=ft.Icons.SEARCH_ROUNDED,
-            text_size=12,
-            height=40,
-            width=260,
-            dense=True,
-            content_padding=ft.padding.symmetric(horizontal=Space.MD, vertical=0),
-            filled=True,
-            fill_color=p.surface_alt,
-            border_color=p.border,
-            focused_border_color=p.primary,
-            border_radius=Radius.MD,
-            on_submit=on_filter,
             on_change=on_filter,
+            on_submit=on_filter,
         )
 
         return ft.Row(
             [
-                text_field,
+                text_input,
                 widgets.IconButton(ft.Icons.UNFOLD_MORE_ROUNDED, "Expand all folders", set_folders(True)),
                 widgets.IconButton(ft.Icons.UNFOLD_LESS_ROUNDED, "Collapse all folders", set_folders(False)),
             ],

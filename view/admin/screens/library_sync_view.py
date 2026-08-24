@@ -108,12 +108,6 @@ APPLY_SCRIPT = [
     ("DONE", "Update completed"),
 ]
 
-KEEPS = [
-    (ft.Icons.SHIELD_ROUNDED, "resources\\files", "Your local mirror of the Drive folder is never touched."),
-    (ft.Icons.CLOUD_DONE_ROUNDED, "Google Drive", "Accessed read-only - nothing on Drive is modified."),
-]
-
-
 class LibrarySyncView(BaseView):
 
     portal: Portal[AdminState]
@@ -145,23 +139,12 @@ class LibrarySyncView(BaseView):
         ]
 
         if mode == "reset":
+            # The warning, what a reset touches, and the confirmation itself
+            # all live in the dialog now - see _open_dialog(). The screen is
+            # the steps and the log, and nothing else.
             children += [
-                self._warning_banner(),
-                ft.Container(height=Space.LG),
-                ft.Row(
-                    [
-                        ft.Container(
-                            content=self._steps(RESET_STAGES, "danger", "Pipeline steps",
-                                                "What a full rebuild does, in order."),
-                            expand=3,
-                        ),
-                        ft.Container(content=self._confirm(), expand=2),
-                    ],
-                    spacing=Space.LG,
-                    vertical_alignment=ft.CrossAxisAlignment.START,
-                ),
-                ft.Container(height=Space.LG),
-                self._impact(),
+                self._steps(RESET_STAGES, "danger", "Pipeline steps",
+                            "What a full rebuild does, in order."),
                 ft.Container(height=Space.LG),
                 self._console(mode),
             ]
@@ -276,19 +259,13 @@ class LibrarySyncView(BaseView):
             )
 
         if mode == "reset":
-            is_armed = self.portal.state.reset_confirm.strip() == CONFIRM_WORD
-            return ft.FilledButton(
-                text="Reset library",
+            # Always live. Nothing is destroyed by opening the dialog, and the
+            # dialog is where CONFIRM_WORD has to be typed before anything runs.
+            return widgets.PrimaryButton(
+                "Reset library",
                 icon=ft.Icons.DELETE_FOREVER_ROUNDED,
-                disabled=not is_armed,
+                tone_name="danger",
                 on_click=lambda _: self._open_dialog(),
-                style=ft.ButtonStyle(
-                    bgcolor={ft.ControlState.DEFAULT: p.danger, ft.ControlState.DISABLED: p.surface_high},
-                    color={ft.ControlState.DEFAULT: p.on_primary, ft.ControlState.DISABLED: p.text_faint},
-                    padding=ft.padding.symmetric(horizontal=Space.XL, vertical=Space.LG),
-                    shape=ft.RoundedRectangleBorder(radius=Radius.MD),
-                    text_style=ft.TextStyle(size=13, weight=ft.FontWeight.W_600),
-                ),
             )
 
         if stage == "idle":
@@ -344,8 +321,8 @@ class LibrarySyncView(BaseView):
             fraction = progress[1] if progress else 0.0
             active_index = min(int(fraction * len(stages)), len(stages) - 1)
 
-        rows = []
-        for index, (name, description) in enumerate(stages):
+        cards = []
+        for index, (name, step_description) in enumerate(stages):
             if index < active_index:
                 icon, tone_name = ft.Icons.CHECK_CIRCLE_ROUNDED, "success"
             elif index == active_index:
@@ -353,43 +330,53 @@ class LibrarySyncView(BaseView):
             else:
                 icon, tone_name = ft.Icons.RADIO_BUTTON_UNCHECKED_ROUNDED, "neutral"
 
-            fg, _ = tone(tone_name)
-            rows.append(
-                ft.Row(
-                    [
-                        ft.Icon(icon, size=18, color=fg),
-                        ft.Column(
-                            [
-                                ft.Text(f"{index + 1}. {name}", size=13, weight=ft.FontWeight.W_600, color=p.text),
-                                ft.Text(description, size=11, color=p.text_muted),
-                            ],
-                            spacing=1,
-                            expand=True,
-                        ),
-                        widgets.Pill(
-                            "done" if index < active_index else
-                            ("running" if index == active_index else "pending"),
-                            tone_name,
-                        ),
-                    ],
-                    spacing=Space.MD,
-                    vertical_alignment=ft.CrossAxisAlignment.CENTER,
-                )
-            )
-
-        if progress:
-            caption, fraction = progress
-            progress_row = widgets.ProgressRow(caption, fraction, accent)
-        elif stage == "done":
-            progress_row = widgets.ProgressRow("Completed", 1.0, "success")
-        else:
-            progress_row = widgets.ProgressRow("Waiting to start", 0.0, "neutral")
+            cards.append(self._step_card(index, name, step_description, icon, tone_name,
+                                         active_index))
 
         return widgets.Section(
             heading,
             description,
             trailing=self._status_pill(stage, accent),
-            content=ft.Column([ft.Column(rows, spacing=Space.LG), widgets.Divider(), progress_row], spacing=0),
+            # Equal columns rather than a stack: the steps run left to right,
+            # so the whole pipeline is one line to read across.
+            content=ft.Row(cards, spacing=Space.MD,
+                           vertical_alignment=ft.CrossAxisAlignment.STRETCH),
+        )
+
+    def _step_card(self, index, name, description, icon, tone_name, active_index):
+        """One step, as a column in the horizontal list."""
+        p = self.p
+        fg, bg = tone(tone_name)
+        is_active = index == active_index
+
+        return ft.Container(
+            content=ft.Column(
+                [
+                    ft.Row(
+                        [
+                            ft.Icon(icon, size=18, color=fg),
+                            ft.Text(f"Step {index + 1}", size=11,
+                                    weight=ft.FontWeight.W_700, color=fg, expand=True),
+                            widgets.Pill(
+                                "done" if index < active_index else
+                                ("running" if is_active else "pending"),
+                                tone_name,
+                            ),
+                        ],
+                        spacing=Space.SM,
+                        vertical_alignment=ft.CrossAxisAlignment.CENTER,
+                    ),
+                    ft.Container(height=Space.XS),
+                    ft.Text(name, size=13, weight=ft.FontWeight.W_600, color=p.text),
+                    ft.Text(description, size=11, color=p.text_muted),
+                ],
+                spacing=2,
+            ),
+            padding=Space.MD,
+            bgcolor=bg if is_active else p.surface_alt,
+            border=ft.border.all(1, fg if is_active else p.border_soft),
+            border_radius=Radius.MD,
+            expand=True,
         )
 
     @staticmethod
@@ -1108,134 +1095,29 @@ class LibrarySyncView(BaseView):
         if completed:
             self.portal.show_notice_bar(f"Updated {len(picked)} files.", "success")
 
-    # --- reset side panel ----------------------------------------------------
-
-    def _warning_banner(self):
-        p = self.p
-        fg, bg = tone("danger")
-        return ft.Container(
-            content=ft.Row(
-                [
-                    ft.Icon(ft.Icons.WARNING_AMBER_ROUNDED, size=22, color=fg),
-                    ft.Column(
-                        [
-                            ft.Text("This action cannot be undone", size=13,
-                                    weight=ft.FontWeight.W_700, color=fg),
-                            ft.Text(
-                                "Converted text and every embedding are deleted before the rebuild starts. "
-                                "A full run takes a few minutes because each .docx and image is OCR'd again.",
-                                size=12,
-                                color=p.text_muted,
-                            ),
-                        ],
-                        spacing=2,
-                        expand=True,
-                    ),
-                ],
-                spacing=Space.LG,
-                vertical_alignment=ft.CrossAxisAlignment.START,
-            ),
-            padding=Space.LG,
-            bgcolor=bg,
-            border=ft.border.all(1, fg),
-            border_radius=Radius.MD,
-        )
-
-    @staticmethod
-    def _wipes():
-        """Built per render - the collection name is read from the setting table."""
-        return [
-            (ft.Icons.FOLDER_DELETE_ROUNDED, "resources\\converted_files",
-             "Deleted and recreated - every source file is converted again."),
-            (ft.Icons.DELETE_SWEEP_ROUNDED, f"Chroma collection {settingService.get(EMBEDDING_COLLECTION)}",
-             "Dropped and recreated, then re-embedded from scratch."),
-        ]
-
-    def _impact(self):
-        p = self.p
-
-        def group(heading, entries, tone_name):
-            rows = []
-            for icon, name, description in entries:
-                rows.append(
-                    ft.Row(
-                        [
-                            widgets.IconBadge(icon, tone_name, size=34, icon_size=16),
-                            ft.Column(
-                                [
-                                    ft.Text(name, size=13, weight=ft.FontWeight.W_600, color=p.text),
-                                    ft.Text(description, size=11, color=p.text_muted),
-                                ],
-                                spacing=1,
-                                expand=True,
-                            ),
-                        ],
-                        spacing=Space.MD,
-                        vertical_alignment=ft.CrossAxisAlignment.CENTER,
-                    )
-                )
-            return ft.Column([widgets.Label(heading)] + rows, spacing=Space.MD)
-
-        return widgets.Section(
-            "What a reset touches",
-            content=ft.Row(
-                [
-                    ft.Container(content=group("Wiped and rebuilt", self._wipes(), "danger"), expand=True),
-                    ft.Container(content=group("Left untouched", KEEPS, "success"), expand=True),
-                ],
-                spacing=Space.XXL,
-                vertical_alignment=ft.CrossAxisAlignment.START,
-            ),
-        )
-
-    def _confirm(self):
-        p = self.p
-        typed = self.portal.state.reset_confirm
-        is_armed = typed.strip() == CONFIRM_WORD
-
-        def on_change(e):
-            was_armed = self.portal.state.reset_confirm.strip() == CONFIRM_WORD
-            self.portal.state.reset_confirm = e.control.value
-            if (e.control.value.strip() == CONFIRM_WORD) != was_armed:
-                self.portal.refresh()
-
-        text_field = ft.TextField(
-            value=typed,
-            hint_text=f"Type {CONFIRM_WORD} to enable",
-            hint_style=ft.TextStyle(size=12, color=p.text_faint),
-            text_size=13,
-            height=44,
-            dense=True,
-            content_padding=ft.padding.symmetric(horizontal=Space.MD, vertical=0),
-            filled=True,
-            fill_color=p.surface_alt,
-            border_color=p.danger if is_armed else p.border,
-            focused_border_color=p.danger,
-            border_radius=Radius.MD,
-            on_change=on_change,
-        )
-
-        return widgets.Section(
-            "Confirm reset",
-            f"Type {CONFIRM_WORD} to unlock the run button.",
-            trailing=widgets.Pill("Armed" if is_armed else "Locked",
-                            "danger" if is_armed else "neutral",
-                            ft.Icons.LOCK_OPEN_ROUNDED if is_armed else ft.Icons.LOCK_OUTLINE_ROUNDED),
-            content=ft.Column(
-                [
-                    text_field,
-                    widgets.Divider(bottom=Space.MD),
-                    widgets.KvRow("Files to convert", data.STATS["source_files"]),
-                    widgets.KvRow("Estimated duration", "~5 min"),
-                    widgets.KvRow("Embedding model", settingService.get(EMBEDDING_MODEL), is_mono=True),
-                    widgets.KvRow("Last reset", "6 days ago"),
-                ],
-                spacing=Space.MD,
-            ),
-        )
+    # --- confirming a reset ---------------------------------------------------
 
     def _open_dialog(self):
+        """Everything destructive about a reset, in one place.
+
+        The screen used to carry a warning banner, a panel of what a reset
+        touches and a separate confirm box. All three said the same thing to
+        someone who was not about to press the button, so they live here now -
+        on the one screen where a reset is actually being started.
+        """
         p = self.p
+        # Cleared each time the dialog opens: an armed field left over from a
+        # dialog that was cancelled would unlock this one on sight.
+        self.portal.state.reset_confirm = ""
+
+        confirm_button = widgets.PrimaryButton(
+            "Yes, reset",
+            tone_name="danger",
+            on_click=lambda _: self._confirmed(alert_dialog),
+        )
+        confirm_button.disabled = True
+
+        text_field = self._confirm_field(confirm_button)
 
         alert_dialog = ft.AlertDialog(
             modal=True,
@@ -1249,26 +1131,70 @@ class LibrarySyncView(BaseView):
                 spacing=Space.MD,
             ),
             content=ft.Container(
-                content=ft.Text(
-                    f"{data.STATS['converted_files']} converted files and "
-                    f"{data.STATS['embedded']} embeddings will be deleted, then rebuilt "
-                    f"from {data.STATS['source_files']} source files.",
-                    size=13,
-                    color=p.text_muted,
+                content=ft.Column(
+                    [
+                        ft.Text(
+                            "This cannot be undone. Converted text and every embedding "
+                            "are deleted before the rebuild starts, and a full run takes "
+                            "a few minutes because each .docx and image is OCR'd again.",
+                            size=13,
+                            color=p.text_muted,
+                        ),
+                        widgets.Divider(),
+                        widgets.KvRow("Files to convert", data.STATS["source_files"]),
+                        widgets.KvRow("Estimated duration", "~5 min"),
+                        widgets.KvRow("Embedding model",
+                                      settingService.get(EMBEDDING_MODEL), is_mono=True),
+                        widgets.KvRow("Last reset", "6 days ago"),
+                        widgets.Divider(),
+                        ft.Text(f"Type {CONFIRM_WORD} to enable the button below.",
+                                size=12, color=p.text_muted),
+                        text_field,
+                    ],
+                    spacing=Space.MD,
+                    tight=True,
                 ),
-                width=360,
+                width=380,
             ),
             actions=[
-                widgets.GhostButton("Cancel", on_click=lambda _: self.portal.page.close(alert_dialog)),
-                widgets.PrimaryButton(
-                    "Yes, reset",
-                    tone_name="danger",
-                    on_click=lambda _: self._confirmed(alert_dialog),
-                ),
+                widgets.GhostButton("Cancel", on_click=lambda _: self._dismiss(alert_dialog)),
+                confirm_button,
             ],
             actions_alignment=ft.MainAxisAlignment.END,
         )
         self.portal.page.open(alert_dialog)
+
+    def _confirm_field(self, confirm_button):
+        """The type-RESET box.
+
+        Built to the same measurements as the Library filter - width, height,
+        text size, padding and corner radius all come from FILTER_FIELD - so
+        the two text inputs in the portal read as the same control.
+        """
+        p = self.p
+
+        def on_change(e):
+            self.portal.state.reset_confirm = e.control.value
+            is_armed = e.control.value.strip() == CONFIRM_WORD
+            if confirm_button.disabled != (not is_armed):
+                confirm_button.disabled = not is_armed
+                confirm_button.update()
+            # The border follows the field, not the button, so it always says
+            # whether what has been typed counts.
+            e.control.border_color = p.danger if is_armed else p.border
+            e.control.update()
+
+        return widgets.TextInput(
+            ft.Icons.LOCK_OUTLINE_ROUNDED,
+            f"Type {CONFIRM_WORD} to enable",
+            accent=p.danger,
+            autofocus=True,
+            on_change=on_change,
+        )
+
+    def _dismiss(self, alert_dialog):
+        self.portal.state.reset_confirm = ""
+        self.portal.page.close(alert_dialog)
 
     def _confirmed(self, alert_dialog):
         self.portal.page.close(alert_dialog)

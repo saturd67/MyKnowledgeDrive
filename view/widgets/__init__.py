@@ -37,6 +37,7 @@ from view.widgets.feedback import (
     NoticeBar,
     ProgressRow,
 )
+from view.widgets.inputs import TextInput
 from view.widgets.text import Body, Label, Mono, Subtitle, Title
 
 __all__ = [
@@ -46,6 +47,8 @@ __all__ = [
     "Card", "Section", "IconBadge", "Pill", "Divider",
     # buttons
     "PrimaryButton", "PrimaryIconButton", "GhostButton", "IconButton",
+    # inputs
+    "TextInput",
     # feedback
     "NoticeBar", "EmptyState", "ProgressRow", "LogLine", "LogConsole",
     # composite blocks

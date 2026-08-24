@@ -28,6 +28,28 @@ class Radius:
     PILL = 999
 
 
+class Field:
+    """One shape for every single-line text input in the portal.
+
+    The Library filter and the reset confirmation box are the same control to
+    look at, so they read their measurements from here rather than each
+    carrying its own numbers and drifting apart.
+    """
+
+    WIDTH = 260
+    HEIGHT = 40
+    TEXT_SIZE = 12
+
+    #: Horizontal inset for the text. Vertical is 0 - `dense` plus a fixed
+    #: HEIGHT already centres the line, and padding on top of that pushes the
+    #: text off centre.
+    PADDING_X = Space.MD
+
+    @classmethod
+    def padding(cls):
+        return ft.padding.symmetric(horizontal=cls.PADDING_X, vertical=0)
+
+
 class Window:
     """Shared geometry - both portals run in the same window."""
     WIDTH = 1280
