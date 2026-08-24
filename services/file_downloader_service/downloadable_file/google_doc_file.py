@@ -1,6 +1,6 @@
 import logging
 
-from services.file_downloader.downloadable_file.downloadable_file import DownloadableFile
+from services.file_downloader_service.downloadable_file.downloadable_file import DownloadableFile
 from pathlib import Path
 
 logger = logging.getLogger(__name__)

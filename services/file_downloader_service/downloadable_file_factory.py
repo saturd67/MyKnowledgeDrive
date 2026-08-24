@@ -6,10 +6,10 @@ downloadable_file/, plus one branch here.
 
 from pathlib import Path
 
-from services.file_downloader.downloadable_file.docx_file import DocxFile
-from services.file_downloader.downloadable_file.google_doc_file import GoogleDocFile
-from services.file_downloader.downloadable_file.keep_as_is_file import KeepAsIsFile
-from services.file_downloader.downloadable_file.unsupported_file import UnsupportedFile
+from services.file_downloader_service.downloadable_file.docx_file import DocxFile
+from services.file_downloader_service.downloadable_file.google_doc_file import GoogleDocFile
+from services.file_downloader_service.downloadable_file.keep_as_is_file import KeepAsIsFile
+from services.file_downloader_service.downloadable_file.unsupported_file import UnsupportedFile
 
 
 class DownloadableFileFactory:

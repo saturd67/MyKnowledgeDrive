@@ -3,7 +3,7 @@
 Deliberately self-contained - it does not read the setting table or any other
 service, so it can be run on its own before the feature is wired into the app:
 
-    python -m services.file_downloader.file_downloader_service
+    python -m services.file_downloader_service.file_downloader_service
 
 The folder, output directory and credentials are the constants below - edit
 them to point the test somewhere else.
@@ -27,7 +27,7 @@ from google.oauth2.service_account import Credentials
 from googleapiclient.discovery import build
 from googleapiclient.errors import HttpError
 
-from services.file_downloader.downloadable_file_factory import DownloadableFileFactory
+from services.file_downloader_service.downloadable_file_factory import DownloadableFileFactory
 
 logger = logging.getLogger(__name__)
 
