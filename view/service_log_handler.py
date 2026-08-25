@@ -7,7 +7,7 @@ a real run reads the way the scripted one did and every line says which module
 it came from.
 
 Refreshes are throttled: a full rebuild logs a line per file, and repainting
-the screen for each one would make the run slower than the work it reports.
+the console for each one would make the run slower than the work it reports.
 """
 
 import logging
@@ -25,10 +25,14 @@ LEVEL_NAMES = {
 class ServiceLogHandler(logging.Handler):
     """Appends `services.*` log records to a list, refreshing now and then.
 
+    `refresh` is whatever puts the list on screen - the screen hands it the
+    call that appends to the console standing on the page, so the log keeps
+    where it is scrolled to while a run writes underneath it.
+
     Use it as a context manager so the handler is always removed again, even
     when the run raises:
 
-        with ServiceLogHandler(state.sync_log, portal.refresh):
+        with ServiceLogHandler(state.sync_log, self._stream_log):
             library_reset_service.start_reset(...)
     """
 

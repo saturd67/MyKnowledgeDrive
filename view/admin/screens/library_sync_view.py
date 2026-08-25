@@ -394,17 +394,29 @@ class LibrarySyncView(BaseView):
 
     def _console(self, mode):
         # Both modes log for real now - see _reset() and _play().
-        lines = self.portal.state.sync_log
+        state = self.portal.state
+        lines = state.sync_log
 
-        content = (
-            widgets.LogConsole(lines)
-            if lines
-            else widgets.EmptyState(
-                ft.Icons.TERMINAL_ROUNDED,
-                "Log is empty",
-                "Output from the converter and the embedder will stream here.",
-                height=200,
+        log_console = (
+            widgets.LogConsole(
+                lines,
+                # Where the last console was left. A run rebuilds this screen
+                # at each step, and the log has to come back reading the same.
+                is_at_bottom=state.is_log_at_bottom,
+                scroll_offset=state.log_offset,
+                on_scrolled=self._on_log_console_scrolled,
             )
+            if lines
+            else None
+        )
+        # A run streams into whichever console is on the page - see _stream_log().
+        state.log_console = log_console
+
+        content = log_console or widgets.EmptyState(
+            ft.Icons.TERMINAL_ROUNDED,
+            "Log is empty",
+            "Output from the converter and the embedder will stream here.",
+            height=200,
         )
         return widgets.Section(
             "Run log",
@@ -961,6 +973,26 @@ class LibrarySyncView(BaseView):
         service by ServiceLogHandler. `source` names the writer either way."""
         self.portal.state.sync_log.append((time.strftime("%H:%M:%S"), level, message, source))
 
+    def _on_log_console_scrolled(self, is_at_bottom, offset):
+        """Where the console was left, for the next one built - the run that is
+        writing to it is holding a screen that has already been rebuilt."""
+        self.portal.state.is_log_at_bottom = is_at_bottom
+        self.portal.state.log_offset = offset
+
+    def _stream_log(self):
+        """Put the lines logged since the last call on screen.
+
+        Going through portal.refresh() would build a new console for every
+        batch, and a console built fresh has lost where it was scrolled to.
+        Appending to the one on the page instead keeps the position, so a log
+        being read stays put while the run writes underneath it.
+        """
+        log_console = self.portal.state.log_console
+        # Detached once the screen is rebuilt or navigated away from; whatever
+        # is on the page next renders the whole log anyway.
+        if log_console is not None and log_console.page is not None:
+            log_console.sync(self.portal.state.sync_log)
+
     def _cancel(self):
         self.portal.state.is_sync_cancelled = True
         self.portal.show_notice_bar("Stopping after the current file.", "warning")
@@ -989,6 +1021,9 @@ class LibrarySyncView(BaseView):
         state = self.portal.state
         state.sync_stage = "scanning"
         state.sync_log = []
+        state.log_console = None
+        state.is_log_at_bottom = True
+        state.log_offset = 0.0
         state.sync_error = None
         state.sync_result = None
         state.is_sync_cancelled = False
@@ -1056,6 +1091,10 @@ class LibrarySyncView(BaseView):
         """
         state = self.portal.state
         state.sync_log = []
+        state.log_console = None
+        # A run starts at its first line, so the log follows the tail again.
+        state.is_log_at_bottom = True
+        state.log_offset = 0.0
         state.sync_error = None
         state.sync_result = None
         state.is_sync_cancelled = False
@@ -1073,7 +1112,7 @@ class LibrarySyncView(BaseView):
 
         library_reset_service = LibraryResetService()
         try:
-            with ServiceLogHandler(state.sync_log, self.portal.refresh):
+            with ServiceLogHandler(state.sync_log, self._stream_log):
                 results = library_reset_service.start_reset(
                     on_step=on_step,
                     is_cancelled=lambda: state.is_sync_cancelled,

@@ -8,6 +8,7 @@ phases of a sync run.
 from dataclasses import dataclass, field
 
 from view.portal_state import PortalState
+from view.widgets.feedback.log_console import LogConsole
 
 
 def _groups_open():
@@ -47,6 +48,17 @@ class AdminState(PortalState):
 
     #: (hh:mm:ss, LEVEL, message) per line.
     sync_log: list[tuple[str, str, str]] = field(default_factory=list)
+
+    #: The run log console currently on the page, so a run can append to it
+    #: where it stands - rebuilding the screen for every line would throw away
+    #: where the log is scrolled to. None while there is nothing logged.
+    log_console: LogConsole | None = None
+
+    #: Where the run log is scrolled, kept across the rebuilds a run does.
+    #: While it is at the bottom, lines arriving keep it there; scrolled up,
+    #: the offset is what a console built fresh goes back to.
+    is_log_at_bottom: bool = True
+    log_offset: float = 0.0
 
     #: (caption, 0..1 or None) while a run is in progress, else None.
     sync_progress: tuple[str, float | None] | None = None
