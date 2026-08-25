@@ -12,9 +12,6 @@ from PIL import Image, UnidentifiedImageError
 
 logger = logging.getLogger(__name__)
 
-# The folder the downloader wrote into - edit it to convert somewhere else.
-SOURCE_DIR = str(Path(__file__).resolve().parents[2] / "resources" / "test" / "downloaded_files")
-
 
 class ImageConverterService:
     """Turns an image into the text it contains.
@@ -209,9 +206,3 @@ class ImageConverterService:
     @staticmethod
     def _to_text_block(text):
         return ImageConverterService.IMAGE_TEXT_TEMPLATE.format(text=text)
-
-
-if __name__ == "__main__":
-    logging.basicConfig(level=logging.INFO, format="%(levelname)s %(message)s")
-    image_converter_service = ImageConverterService()
-    image_converter_service.start_converting_images(SOURCE_DIR)

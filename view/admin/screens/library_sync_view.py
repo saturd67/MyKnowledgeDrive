@@ -17,10 +17,15 @@ import flet as ft
 
 from constant.settings import EMBEDDING_MODEL
 from services.SettingService import settingService
+from services.library_reset_service.library_reset_service import (
+    LibraryResetCancelled,
+    LibraryResetService,
+)
 from view import mock_data as data
 from view import widgets
 from view.admin.admin_state import AdminState
 from view.base_view import BaseView
+from view.service_log_handler import ServiceLogHandler
 from view.protocols.portal import Portal
 from view.theme import Radius, Space, tone
 
@@ -388,10 +393,8 @@ class LibrarySyncView(BaseView):
         return widgets.Pill(text, tone_name, icon)
 
     def _console(self, mode):
-        if mode == "reset":
-            lines = data.RESET_LOG if self.portal.state.sync_stage == "done" else []
-        else:
-            lines = self.portal.state.sync_log
+        # Both modes log for real now - see _reset() and _play().
+        lines = self.portal.state.sync_log
 
         content = (
             widgets.LogConsole(lines)
@@ -953,8 +956,10 @@ class LibrarySyncView(BaseView):
 
     # --- runs (scripted for now) ---------------------------------------------
 
-    def _log(self, level, message):
-        self.portal.state.sync_log.append((time.strftime("%H:%M:%S"), level, message))
+    def _log(self, level, message, source="library_sync_view"):
+        """A line the screen writes itself, as opposed to one captured from a
+        service by ServiceLogHandler. `source` names the writer either way."""
+        self.portal.state.sync_log.append((time.strftime("%H:%M:%S"), level, message, source))
 
     def _cancel(self):
         self.portal.state.is_sync_cancelled = True
@@ -1041,6 +1046,68 @@ class LibrarySyncView(BaseView):
         self.portal.refresh()
         if completed:
             self.portal.show_notice_bar(f"Updated {len(picked)} files.", "success")
+
+    def _reset(self):
+        """The real full rebuild - LibraryResetService drives the three services.
+
+        Flet dispatches this handler on a worker thread, so the run does not
+        block the UI; the log lines the services emit arrive through
+        ServiceLogHandler, which refreshes the screen as they come in.
+        """
+        state = self.portal.state
+        state.sync_log = []
+        state.sync_error = None
+        state.sync_result = None
+        state.is_sync_cancelled = False
+        state.sync_stage = "updating"
+        state.sync_progress = (f"Step 1 of {len(RESET_STAGES)}", 0.0)
+        self._log("INFO", "Starting a full rebuild")
+        self.portal.refresh()
+
+        def on_step(step_number, step_name):
+            state.sync_progress = (
+                f"Step {step_number} of {len(RESET_STAGES)}",
+                (step_number - 1) / len(RESET_STAGES),
+            )
+            self.portal.refresh()
+
+        library_reset_service = LibraryResetService()
+        try:
+            with ServiceLogHandler(state.sync_log, self.portal.refresh):
+                results = library_reset_service.start_reset(
+                    on_step=on_step,
+                    is_cancelled=lambda: state.is_sync_cancelled,
+                )
+        except LibraryResetCancelled:
+            self._log("WARN", "Cancelled - what was written so far is left as it is")
+            self._finish_reset("idle")
+            return
+        except Exception as error:
+            # Anything the services raise - a missing credentials file, a Drive
+            # error, a locked folder. It belongs on the screen, not in a
+            # traceback on a worker thread nobody is watching.
+            self._log("ERROR", str(error))
+            state.sync_error = str(error)
+            self._finish_reset("idle")
+            self.portal.show_notice_bar("Reset failed - see the log below.", "danger")
+            return
+
+        state.sync_result = {
+            "converted": results["converted"],
+            "added": results["embedded"],
+            "updated": 0,
+            "removed": 0,
+            "skipped": results["download_skipped"],
+            "failed": results["download_failed"] + results["convert_failed"] + results["embed_failed"],
+        }
+        self._log("DONE", f"Rebuild completed - {results['embedded']} documents embedded")
+        self._finish_reset("done")
+        self.portal.show_notice_bar(f"Rebuilt {results['embedded']} documents.", "success")
+
+    def _finish_reset(self, stage):
+        self.portal.state.sync_progress = None
+        self.portal.state.sync_stage = stage
+        self.portal.refresh()
 
     # --- confirming a reset ---------------------------------------------------
 
@@ -1145,6 +1212,4 @@ class LibrarySyncView(BaseView):
 
     def _confirmed(self, alert_dialog):
         self.portal.page.close(alert_dialog)
-        # TODO: wire to FileConverterService.start_convert_files() then
-        # TextEmbedderService.reset_collection() + embed_collection()
-        self.portal.not_implemented("Reset library")
+        self._reset()

@@ -1,12 +1,9 @@
-"""Standalone test for downloading a Google Drive folder to disk.
+"""Downloads a Google Drive folder to disk.
 
-Deliberately self-contained - it does not read the setting table or any other
-service, so it can be run on its own before the feature is wired into the app:
-
-    python -m services.file_downloader_service.file_downloader_service
-
-The folder, output directory and credentials are the constants below - edit
-them to point the test somewhere else.
+Self-contained - it reads no setting itself. The folder, the output directory
+and the credentials are arguments, so the caller decides where a run reads and
+writes: LibraryResetService passes what the setting table holds, and the tests
+pass a temporary folder.
 
 This module only walks the folder tree. What happens to a file once it is found
 belongs to the DownloadableFile subclass that DownloadableFileFactory picks, one
@@ -31,11 +28,6 @@ from services.file_downloader_service.downloadable_file_factory import Downloada
 
 logger = logging.getLogger(__name__)
 
-SERVICE_ACCOUNT_FILE = "C:/secrets/my_knowledge_drive_service_account.json"
-FOLDER_ID = "1VWtBJ4KClTf7v8ULab7VN-45QK-au0DO"
-OUTPUT_DIR = str(Path(__file__).resolve().parents[2] / "resources" / "test" / "downloaded_files")
-SCOPE = "https://www.googleapis.com/auth/drive.readonly"
-
 
 class FileDownloaderService:
     """Walks a Drive folder and hands every file it finds to the factory."""
@@ -45,7 +37,7 @@ class FileDownloaderService:
     PAGE_SIZE = 1000
     INVALID_NAME_CHARACTERS = re.compile(r'[<>:"/\\|?*\x00-\x1f]')
 
-    def __init__(self, folder_id, output_dir, service_account_file, scope=SCOPE):
+    def __init__(self, folder_id, output_dir, service_account_file, scope):
         self.folder_id = folder_id
         self.output_dir = Path(output_dir)
         credentials = Credentials.from_service_account_file(service_account_file, scopes=[scope])
@@ -124,9 +116,3 @@ class FileDownloaderService:
     def _sanitize_name(name):
         """Drive names may hold characters Windows will not accept in a path."""
         return FileDownloaderService.INVALID_NAME_CHARACTERS.sub("_", name).strip().rstrip(".") or "untitled"
-
-
-if __name__ == "__main__":
-    logging.basicConfig(level=logging.INFO, format="%(levelname)s %(message)s")
-    file_downloader_service = FileDownloaderService(FOLDER_ID, OUTPUT_DIR, SERVICE_ACCOUNT_FILE, SCOPE)
-    file_downloader_service.start_download()
