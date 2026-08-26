@@ -7,9 +7,16 @@ layouts, and services/ for the code that does the real work.
 
 import flet as ft
 
-from services.SettingService import settingService
-from view.main import main
+from view import theme
+from view.main_view import MainView
+
+def main(page: ft.Page):
+    page.title = "MyKnowledgeDrive - Admin Portal"
+    page.padding = 0
+    page.spacing = 0
+    theme.apply(page)
+    theme.apply_window(page)
+    page.add(MainView())
 
 if __name__ == "__main__":
-    settingService.initialise()
-    ft.app(target=main)
+    ft.run(main)
