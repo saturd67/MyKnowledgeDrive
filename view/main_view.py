@@ -29,8 +29,17 @@ class MainView(ft.Row):
         # the sidebar where they are.
         self.body_container = ft.Container(content=self._screen(0), expand=True)
 
+        # A screen that scrolls a list of its own fills the viewport and keeps
+        # its scrollbar inside that list, so the page-level scroll is turned
+        # off for it - two nested scrolls leave the inner one unbounded.
+        self.scroll_column = ft.Column(
+            [self.body_container],
+            scroll=ft.ScrollMode.AUTO if SCREENS[0].scrolls else None,
+            expand=True,
+        )
+
         reader_container = ft.Container(
-            content=ft.Column([self.body_container], scroll=ft.ScrollMode.AUTO, expand=True),
+            content=self.scroll_column,
             padding=Space.XXL,
             bgcolor=p.bg,
             expand=True,
@@ -43,8 +52,9 @@ class MainView(ft.Row):
         ]
 
     def show_screen(self, index):
+        self.scroll_column.scroll = ft.ScrollMode.AUTO if SCREENS[index].scrolls else None
         self.body_container.content = self._screen(index)
-        self.body_container.update()
+        self.scroll_column.update()
 
     @staticmethod
     def _screen(index):
