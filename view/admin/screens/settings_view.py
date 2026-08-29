@@ -1,5 +1,9 @@
 """Settings: the rows of the setting table, edited in place.
 
+The screen and its three cards live together - a card is one section of this
+one screen, never used anywhere else, and the three are read and changed
+together whenever the setting table changes.
+
 Presentation only - the values below are placeholders, nothing reads
 `SettingService`, and Save/Revert are not wired up.
 """
@@ -7,7 +11,7 @@ Presentation only - the values below are placeholders, nothing reads
 import flet as ft
 
 from view.base_view import BaseView
-from view.theme import Radius, Space
+from view.theme import Radius, Space, palette
 from view.widgets.blocks.page_header import PageHeader
 from view.widgets.blocks.row_label import RowLabel
 from view.widgets.buttons.ghost_button import GhostButton
@@ -21,19 +25,18 @@ from view.widgets.text.mono import Mono
 
 #: Stand-ins for the setting table until this screen is wired to SettingService.
 BASE_DIR = r"C:\Users\cheah\Desktop\Apps\MyKnowledgeDrive"
-CHROMA_STORE_PATH = r"C:\Users\cheah\Desktop\Apps\MyKnowledgeDrive\resources\my_chroma_store"
+INPUT_DIR = r"resources\files"
+OUTPUT_DIR = r"resources\converted_files"
+CHROMA_STORE = r"resources\my_chroma_store"
 
-VALUES = {
-    "input_dir": r"resources\files",
-    "output_dir": r"resources\converted_files",
-    "chroma_store": r"resources\my_chroma_store",
-    "drive_folder_id": "1VWtBJ4KClTf7v8ULab7VN-45QK-au0DO",
-    "drive_service_account_file": "C:/secrets/my_knowledge_drive_service_account.json",
-    "drive_scope": "https://www.googleapis.com/auth/drive.readonly",
-    "embedding_model": "all-MiniLM-L6-v2",
-    "embedding_collection": "my_knowledge_drive",
-    "embedding_results_per_query": "10",
-}
+DRIVE_FOLDER_ID = "1VWtBJ4KClTf7v8ULab7VN-45QK-au0DO"
+DRIVE_SERVICE_ACCOUNT_FILE = "C:/secrets/my_knowledge_drive_service_account.json"
+DRIVE_SCOPE = "https://www.googleapis.com/auth/drive.readonly"
+
+EMBEDDING_MODEL = "all-MiniLM-L6-v2"
+EMBEDDING_COLLECTION = "my_knowledge_drive"
+EMBEDDING_STORE_PATH = r"C:\Users\cheah\Desktop\Apps\MyKnowledgeDrive\resources\my_chroma_store"
+EMBEDDING_RESULTS_PER_QUERY = "10"
 
 
 class SettingsView(BaseView):
@@ -54,16 +57,16 @@ class SettingsView(BaseView):
                         ft.Container(
                             content=ft.Column(
                                 [
-                                    self._paths(), 
-                                    self._drive()
+                                    PathsSection(),
+                                    DriveSection(),
                                 ],
                                 spacing=Space.LG,
                             ),
                             expand=3,
                         ),
                         ft.Container(
-                            content=self._embedding(), 
-                            expand=2
+                            content=EmbeddingSection(),
+                            expand=2,
                         ),
                     ],
                     spacing=Space.LG,
@@ -73,11 +76,13 @@ class SettingsView(BaseView):
             spacing=0,
         )
 
-    # --- sections ------------------------------------------------------------
 
-    def _paths(self):
-        p = self.p
-        return Section(
+class PathsSection(Section):
+    """Where the pipeline reads and writes."""
+
+    def __init__(self):
+        p = palette()
+        super().__init__(
             "Paths",
             "Where the pipeline reads and writes.",
             content=ft.Column(
@@ -96,7 +101,7 @@ class SettingsView(BaseView):
                     ft.Row(
                         [
                             RowLabel("Source files"),
-                            TextInput(VALUES["input_dir"], is_mono=True),
+                            TextInput(INPUT_DIR, is_mono=True),
                             IconButton(ft.Icons.CONTENT_COPY_ROUNDED, "Copy source files"),
                         ],
                         vertical_alignment=ft.CrossAxisAlignment.CENTER,
@@ -104,7 +109,7 @@ class SettingsView(BaseView):
                     ft.Row(
                         [
                             RowLabel("Converted files"),
-                            TextInput(VALUES["output_dir"], is_mono=True),
+                            TextInput(OUTPUT_DIR, is_mono=True),
                             IconButton(ft.Icons.CONTENT_COPY_ROUNDED, "Copy converted files"),
                         ],
                         vertical_alignment=ft.CrossAxisAlignment.CENTER,
@@ -112,7 +117,7 @@ class SettingsView(BaseView):
                     ft.Row(
                         [
                             RowLabel("Chroma store"),
-                            TextInput(VALUES["chroma_store"], is_mono=True),
+                            TextInput(CHROMA_STORE, is_mono=True),
                             IconButton(ft.Icons.CONTENT_COPY_ROUNDED, "Copy chroma store"),
                         ],
                         vertical_alignment=ft.CrossAxisAlignment.CENTER,
@@ -152,9 +157,13 @@ class SettingsView(BaseView):
             ),
         )
 
-    def _drive(self):
-        p = self.p
-        return Section(
+
+class DriveSection(Section):
+    """The Drive folder the mirror is pulled from."""
+
+    def __init__(self):
+        p = palette()
+        super().__init__(
             "Google Drive",
             "Used by services/FileFetcherService.py.",
             trailing=Pill("Read-only scope", "success", ft.Icons.CLOUD_DONE_ROUNDED),
@@ -163,7 +172,7 @@ class SettingsView(BaseView):
                     ft.Row(
                         [
                             RowLabel("Folder id"),
-                            TextInput(VALUES["drive_folder_id"], is_mono=True),
+                            TextInput(DRIVE_FOLDER_ID, is_mono=True),
                             IconButton(ft.Icons.CONTENT_COPY_ROUNDED, "Copy folder id"),
                         ],
                         vertical_alignment=ft.CrossAxisAlignment.CENTER,
@@ -171,7 +180,7 @@ class SettingsView(BaseView):
                     ft.Row(
                         [
                             RowLabel("Service account key"),
-                            TextInput(VALUES["drive_service_account_file"], is_mono=True),
+                            TextInput(DRIVE_SERVICE_ACCOUNT_FILE, is_mono=True),
                             IconButton(ft.Icons.CONTENT_COPY_ROUNDED, "Copy service account key"),
                         ],
                         vertical_alignment=ft.CrossAxisAlignment.CENTER,
@@ -180,7 +189,7 @@ class SettingsView(BaseView):
                         [
                             RowLabel("Scope"),
                             ft.Container(
-                                content=Mono(VALUES["drive_scope"], size=12, color=p.text),
+                                content=Mono(DRIVE_SCOPE, size=12, color=p.text),
                                 expand=True,
                             ),
                         ],
@@ -219,9 +228,13 @@ class SettingsView(BaseView):
             ),
         )
 
-    def _embedding(self):
-        p = self.p
-        return Section(
+
+class EmbeddingSection(Section):
+    """The model documents are indexed with, and where the vectors live."""
+
+    def __init__(self):
+        p = palette()
+        super().__init__(
             "Embedding",
             "Used by services/TextEmbedderService.py.",
             content=ft.Column(
@@ -230,7 +243,7 @@ class SettingsView(BaseView):
                         [
                             RowLabel("Model"),
                             ft.Container(
-                                content=Mono(VALUES["embedding_model"], size=12, color=p.text),
+                                content=Mono(EMBEDDING_MODEL, size=12, color=p.text),
                                 expand=True,
                             ),
                             IconButton(ft.Icons.CONTENT_COPY_ROUNDED, "Copy model name"),
@@ -241,8 +254,7 @@ class SettingsView(BaseView):
                         [
                             RowLabel("Collection"),
                             ft.Container(
-                                content=Mono(VALUES["embedding_collection"], size=12,
-                                             color=p.text),
+                                content=Mono(EMBEDDING_COLLECTION, size=12, color=p.text),
                                 expand=True,
                             ),
                         ],
@@ -252,7 +264,7 @@ class SettingsView(BaseView):
                         [
                             RowLabel("Store"),
                             ft.Container(
-                                content=Mono(CHROMA_STORE_PATH, size=12, color=p.text),
+                                content=Mono(EMBEDDING_STORE_PATH, size=12, color=p.text),
                                 expand=True,
                             ),
                         ],
@@ -261,7 +273,7 @@ class SettingsView(BaseView):
                     ft.Row(
                         [
                             RowLabel("Results per query"),
-                            TextInput(VALUES["embedding_results_per_query"], is_mono=True),
+                            TextInput(EMBEDDING_RESULTS_PER_QUERY, is_mono=True),
                             IconButton(ft.Icons.CONTENT_COPY_ROUNDED, "Copy results per query"),
                         ],
                         vertical_alignment=ft.CrossAxisAlignment.CENTER,
