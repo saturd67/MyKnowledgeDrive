@@ -3,25 +3,20 @@ import flet as ft
 from view.theme import Radius, Space, palette
 
 
-def is_hovering(e):
-    """True while the pointer is over the control.
-
-    Flet has sent `data` as the string "true"/"false" and, on newer versions,
-    as a real bool - accept either so the row highlights on both.
-    """
-    return e.data is True or e.data == "true"
-
-
 class NavItem(ft.Container):
-    """One row in the sidebar navigation: icon, label, selected pill."""
+    """One row in the sidebar navigation: icon, label, selected pill.
 
-    def __init__(self, text, icon, selected_icon, is_selected, on_click):
+    Styling only. The click and the hover highlight belong to the `PointerArea`
+    this is wrapped in - a Container that handles its own click keeps the
+    cursor from ever reaching the pointer.
+    """
+
+    def __init__(self, text, icon, selected_icon, is_selected):
         super().__init__()
         self.text = text
         self.icon = icon
         self.selected_icon = selected_icon
         self.is_selected = is_selected
-        self.on_click = on_click
 
     def build(self):
         p = palette()
@@ -42,12 +37,3 @@ class NavItem(ft.Container):
         self.padding = ft.Padding.symmetric(horizontal=Space.MD, vertical=10)
         self.bgcolor = p.primary_soft if self.is_selected else "transparent"
         self.border_radius = Radius.MD
-        self.on_hover = self._on_hover
-        self.ink = True
-
-    def _on_hover(self, e):
-        if self.is_selected:
-            return
-        p = palette()
-        e.control.bgcolor = p.surface_high if is_hovering(e) else "transparent"
-        e.control.update()

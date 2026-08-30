@@ -20,6 +20,7 @@ from view.widgets.buttons.primary_button import PrimaryButton
 from view.widgets.containers.divider import Divider
 from view.widgets.containers.icon_badge import IconBadge
 from view.widgets.containers.pill import Pill
+from view.widgets.containers.pointer_area import PointerArea
 from view.widgets.containers.section import Section
 from view.widgets.feedback.empty_state import EmptyState
 from view.widgets.text.mono import Mono
@@ -238,22 +239,27 @@ class SyncHeader(ft.Column):
             fg = p.text_muted
             if is_active:
                 fg = p.danger if key == "reset" else p.primary
+            tab_container = ft.Container(
+                content=ft.Row(
+                    [
+                        ft.Icon(icon, size=15, color=fg),
+                        ft.Text(text, size=12, weight=ft.FontWeight.W_600, color=fg),
+                    ],
+                    spacing=Space.SM,
+                    tight=True,
+                ),
+                padding=ft.Padding.symmetric(horizontal=Space.XL, vertical=Space.SM),
+                bgcolor=p.surface if is_active else "transparent",
+                border=ft.Border.all(1, p.border if is_active else "transparent"),
+                border_radius=Radius.SM,
+            )
+            # The tab you are already on is not clickable, so it keeps the arrow.
             tabs.append(
-                ft.Container(
-                    content=ft.Row(
-                        [
-                            ft.Icon(icon, size=15, color=fg),
-                            ft.Text(text, size=12, weight=ft.FontWeight.W_600, color=fg),
-                        ],
-                        spacing=Space.SM,
-                        tight=True,
-                    ),
-                    padding=ft.Padding.symmetric(horizontal=Space.XL, vertical=Space.SM),
-                    bgcolor=p.surface if is_active else "transparent",
-                    border=ft.Border.all(1, p.border if is_active else "transparent"),
-                    border_radius=Radius.SM,
-                    on_click=None if is_active else (lambda _, k=key: self.on_select_mode(k)),
-                    ink=not is_active,
+                PointerArea(
+                    tab_container,
+                    is_clickable=not is_active,
+                    on_click=lambda _, k=key: self.on_select_mode(k),
+                    hover_bgcolor=p.surface_high,
                 )
             )
 

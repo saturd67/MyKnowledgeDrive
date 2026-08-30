@@ -20,6 +20,7 @@ from view.widgets.blocks.stat_card import StatCard
 from view.widgets.buttons.ghost_button import GhostButton
 from view.widgets.buttons.icon_button import IconButton
 from view.widgets.containers.pill import Pill
+from view.widgets.containers.pointer_area import PointerArea
 from view.widgets.containers.section import Section
 from view.widgets.feedback.empty_state import EmptyState
 from view.widgets.text.label import Label
@@ -333,7 +334,8 @@ class DocumentsSection(Section):
             view.folders_open[path] = not is_open
             view.refresh()
 
-        return ft.Container(
+        return PointerArea(
+            content = ft.Container(
             content=ft.Row(
                 [
                     ft.Icon(
@@ -356,9 +358,11 @@ class DocumentsSection(Section):
             ),
             padding=self._row_padding(depth),
             border_radius=Radius.SM,
-            on_click=toggle_open,
-            on_hover=self._on_hover,
-        )
+            bgcolor="transparent",
+        ), 
+        on_click=toggle_open,
+        hover_bgcolor=p.surface_alt
+    )
 
     def _doc_row(self, doc_id, name, kind, depth):
         p = palette()

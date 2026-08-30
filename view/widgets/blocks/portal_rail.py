@@ -1,7 +1,7 @@
 import flet as ft
 
 from view.theme import Radius, Space, palette
-from view.widgets.blocks.nav_item import is_hovering
+from view.widgets.containers.pointer_area import PointerArea
 
 
 class PortalRail(ft.Container):
@@ -43,25 +43,18 @@ class PortalRail(ft.Container):
     def _button(self, key, tooltip, icon, is_active):
         p = palette()
 
-        def on_hover(e):
-            if is_active:
-                return
-            e.control.bgcolor = p.surface_high if is_hovering(e) else "transparent"
-            e.control.update()
-
-        def on_click(_):
-            if self.on_select is not None:
-                self.on_select(key)
-
-        return ft.Container(
-            content=ft.Icon(icon, size=21, color=p.primary if is_active else p.text_faint),
-            width=44,
-            height=44,
-            alignment=ft.Alignment.CENTER,
-            bgcolor=p.primary_soft if is_active else "transparent",
-            border_radius=Radius.MD,
-            tooltip=tooltip,
-            on_hover=on_hover,
-            on_click=None if is_active else on_click,
-            ink=not is_active,
+        # The portal you are already on is not clickable, so it keeps the arrow.
+        return PointerArea(
+            content = ft.Container(
+                content=ft.Icon(icon, size=21, color=p.primary if is_active else p.text_faint),
+                width=44,
+                height=44,
+                alignment=ft.Alignment.CENTER,
+                bgcolor=p.primary_soft if is_active else "transparent",
+                border_radius=Radius.MD,
+                tooltip=tooltip,
+            ),
+            is_clickable=not is_active,
+            on_click=lambda _: self.on_select(key) if self.on_select is not None else None,
+            hover_bgcolor=p.surface_high,
         )

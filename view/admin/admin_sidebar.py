@@ -8,6 +8,7 @@ import flet as ft
 from view.theme import Radius, Space, palette
 from view.widgets.blocks.brand import BrandHeader
 from view.widgets.blocks.nav_item import NavItem
+from view.widgets.containers.pointer_area import PointerArea
 
 #: text, icon, selected icon
 NAV_ITEMS = [
@@ -59,13 +60,13 @@ class AdminSidebar(ft.Container):
             self.on_navigate(index)
 
     def _nav_items(self):
+        p = palette()
         return [
-            NavItem(
-                text,
-                icon,
-                selected_icon,
-                is_selected=index == self.index,
+            PointerArea(
+                NavItem(text, icon, selected_icon, is_selected=index == self.index),
                 on_click=lambda _, i=index: self.navigate(i),
+                # The selected row already has its pill - only the others light up.
+                hover_bgcolor=None if index == self.index else p.surface_high,
             )
             for index, (text, icon, selected_icon) in enumerate(NAV_ITEMS)
         ]

@@ -34,5 +34,11 @@ class PrimaryButton(ft.FilledButton):
                 padding=button_padding(is_dense),
                 shape=ft.RoundedRectangleBorder(radius=Radius.MD),
                 text_style=ft.TextStyle(size=13, weight=ft.FontWeight.W_600),
+                # Per state, like the colours above: a disabled button keeps
+                # the plain arrow rather than inviting a click it will refuse.
+                mouse_cursor={
+                    ft.ControlState.DEFAULT: ft.MouseCursor.CLICK,
+                    ft.ControlState.DISABLED: ft.MouseCursor.BASIC,
+                },
             ),
         )

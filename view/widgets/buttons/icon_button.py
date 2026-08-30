@@ -14,5 +14,11 @@ class IconButton(ft.IconButton):
             tooltip=tooltip,
             on_click=on_click,
             icon_color=fg,
-            style=ft.ButtonStyle(shape=ft.RoundedRectangleBorder(radius=Radius.SM)),
+            style=ft.ButtonStyle(
+                shape=ft.RoundedRectangleBorder(radius=Radius.SM),
+                mouse_cursor={
+                    ft.ControlState.DEFAULT: ft.MouseCursor.CLICK,
+                    ft.ControlState.DISABLED: ft.MouseCursor.BASIC,
+                },
+            ),
         )
