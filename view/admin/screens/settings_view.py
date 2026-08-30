@@ -192,7 +192,7 @@ class SettingsView(BaseView):
 
     # --- banners -------------------------------------------------------------
 
-    def notify(self, section_card_name, message, tone_name="neutral"):
+    def response_message(self, section_card_name, message, tone_name="neutral"):
         """One banner per card, shown just above that card's own buttons.
 
         In the layout rather than over it, so it pushes the buttons down
@@ -202,18 +202,18 @@ class SettingsView(BaseView):
         self.notices[section_card_name] = (message, tone_name)
         self.refresh()
 
-    def hide_notice(self, section_card_name):
+    def hide_response_message(self, section_card_name):
         self.notices.pop(section_card_name, None)
         self.refresh()
 
-    def notice_for(self, section_card_name):
+    def response_message_for(self, section_card_name):
         """The card's banner, or nothing - spliced into the card's column."""
         if section_card_name not in self.notices:
             return []
         message, tone_name = self.notices[section_card_name]
         return [
             NoticeBar(message, tone_name,
-                      on_hide=lambda _=None: self.hide_notice(section_card_name)),
+                      on_hide=lambda _=None: self.hide_response_message(section_card_name)),
         ]
 
     # --- layout --------------------------------------------------------------
@@ -327,7 +327,7 @@ class PathsSectionCard(SectionCard):
                         border_radius=Radius.SM,
                     ),
                     Divider(bottom=Space.SM),
-                    *view.notice_for(self.SECTION_CARD_NAME),
+                    *view.response_message_for(self.SECTION_CARD_NAME),
                     ft.Row(
                         [
                             ft.Container(expand=True),
@@ -359,37 +359,37 @@ class PathsSectionCard(SectionCard):
     def save(self, _=None):
         changes = self.paths.changes()
         if not changes:
-            self.view.notify(self.SECTION_CARD_NAME, "No changes to paths.", "neutral")
+            self.view.response_message(self.SECTION_CARD_NAME, "No changes to paths.", "neutral")
             return
 
         error = self.paths.validate()
         if error:
-            self.view.notify(self.SECTION_CARD_NAME, error, "danger")
+            self.view.response_message(self.SECTION_CARD_NAME, error, "danger")
             return
 
         try:
             settingService.update_all(changes)
         except Exception as error:
-            self.view.notify(self.SECTION_CARD_NAME,
+            self.view.response_message(self.SECTION_CARD_NAME,
                              f"Could not save paths: {error}", "danger")
             return
 
         if PATHS_OUTPUT_DIR in changes:
             # The converted text moves, so what is embedded no longer matches
             # what is on disk. Saved anyway - blocking the edit would be worse.
-            self.view.notify(
+            self.view.response_message(
                 self.SECTION_CARD_NAME,
                 "Saved paths. The existing collection no longer matches - run a reset.",
                 "warning",
             )
         else:
-            self.view.notify(self.SECTION_CARD_NAME, "Saved paths.", "success")
+            self.view.response_message(self.SECTION_CARD_NAME, "Saved paths.", "success")
 
     def revert(self, _=None):
         if not self.paths.changes():
             return
         self.paths.load()
-        self.view.notify(self.SECTION_CARD_NAME, "Reverted paths.", "neutral")
+        self.view.response_message(self.SECTION_CARD_NAME, "Reverted paths.", "neutral")
 
 
 class DriveSectionCard(SectionCard):
@@ -454,7 +454,7 @@ class DriveSectionCard(SectionCard):
                         bgcolor=p.surface_alt,
                         border_radius=Radius.SM,
                     ),
-                    *view.notice_for(self.SECTION_CARD_NAME),
+                    *view.response_message_for(self.SECTION_CARD_NAME),
                     ft.Row(
                         [
                             ft.Container(expand=True),
@@ -481,30 +481,30 @@ class DriveSectionCard(SectionCard):
     def save(self, _=None):
         changes = self.drive.changes()
         if not changes:
-            self.view.notify(self.SECTION_CARD_NAME, "No changes to Drive settings.", "neutral")
+            self.view.response_message(self.SECTION_CARD_NAME, "No changes to Drive settings.", "neutral")
             return
 
         error = self.drive.validate()
         if error:
-            self.view.notify(self.SECTION_CARD_NAME, error, "danger")
+            self.view.response_message(self.SECTION_CARD_NAME, error, "danger")
             return
 
         try:
             settingService.update_all(changes)
         except Exception as error:
-            self.view.notify(self.SECTION_CARD_NAME,
+            self.view.response_message(self.SECTION_CARD_NAME,
                              f"Could not save Drive settings: {error}", "danger")
             return
 
         # Nothing here orphans the collection - a new folder id only changes
         # what the next sync pulls down.
-        self.view.notify(self.SECTION_CARD_NAME, "Saved Drive settings.", "success")
+        self.view.response_message(self.SECTION_CARD_NAME, "Saved Drive settings.", "success")
 
     def revert(self, _=None):
         if not self.drive.changes():
             return
         self.drive.load()
-        self.view.notify(self.SECTION_CARD_NAME, "Reverted Drive settings.", "neutral")
+        self.view.response_message(self.SECTION_CARD_NAME, "Reverted Drive settings.", "neutral")
 
 
 class EmbeddingSectionCard(SectionCard):
@@ -571,7 +571,7 @@ class EmbeddingSectionCard(SectionCard):
                         vertical_alignment=ft.CrossAxisAlignment.CENTER,
                     ),
                     Divider(bottom=Space.SM),
-                    *view.notice_for(self.SECTION_CARD_NAME),
+                    *view.response_message_for(self.SECTION_CARD_NAME),
                     ft.Row(
                         [
                             ft.Container(expand=True),
@@ -595,28 +595,28 @@ class EmbeddingSectionCard(SectionCard):
     def save(self, _=None):
         changes = self.embedding.changes()
         if not changes:
-            self.view.notify(self.SECTION_CARD_NAME, "No changes to embedding settings.",
+            self.view.response_message(self.SECTION_CARD_NAME, "No changes to embedding settings.",
                              "neutral")
             return
 
         error = self.embedding.validate()
         if error:
-            self.view.notify(self.SECTION_CARD_NAME, error, "danger")
+            self.view.response_message(self.SECTION_CARD_NAME, error, "danger")
             return
 
         try:
             settingService.update_all(changes)
         except Exception as error:
-            self.view.notify(self.SECTION_CARD_NAME,
+            self.view.response_message(self.SECTION_CARD_NAME,
                              f"Could not save embedding settings: {error}", "danger")
             return
 
         # The one row that can change here is how many results a search returns,
         # which nothing on disk depends on - no reset warning.
-        self.view.notify(self.SECTION_CARD_NAME, "Saved embedding settings.", "success")
+        self.view.response_message(self.SECTION_CARD_NAME, "Saved embedding settings.", "success")
 
     def revert(self, _=None):
         if not self.embedding.changes():
             return
         self.embedding.load()
-        self.view.notify(self.SECTION_CARD_NAME, "Reverted embedding settings.", "neutral")
+        self.view.response_message(self.SECTION_CARD_NAME, "Reverted embedding settings.", "neutral")
