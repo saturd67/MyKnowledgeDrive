@@ -140,3 +140,48 @@ class LibraryResetService:
         logger.info(f"Step {step_number} of {len(LibraryResetService.STEPS)}: {step_name}")
         if on_step is not None:
             on_step(step_number, step_name)
+
+
+def main():
+    """Runs the whole rebuild from the terminal, without the UI.
+
+    Everything comes from the setting table, the same as the Reset screen, so
+    this is the screen's run with the progress printed instead of drawn.
+
+    Run it from the project root, so the `constant` and `services` imports
+    resolve: `python -m services.library_reset_service.library_reset_service`
+    """
+    logging.basicConfig(
+        level=logging.INFO,
+        format="%(asctime)s %(levelname)s %(name)s - %(message)s",
+    )
+
+    library_reset_service = LibraryResetService()
+    print(f"Input folder    : {library_reset_service.input_dir}")
+    print(f"Output folder   : {library_reset_service.output_dir}")
+    print(f"Chroma store    : {library_reset_service.chroma_store_dir}")
+    print(f"Collection      : {library_reset_service.collection_name}")
+    print("This rewrites both folders and empties the collection.")
+    if input("Type 'reset' to start: ").strip().lower() != "reset":
+        print("Nothing done.")
+        return
+
+    def on_step(step_number, step_name):
+        print(f"\n[{step_number}/{len(LibraryResetService.STEPS)}] {step_name}")
+
+    try:
+        results = library_reset_service.start_reset(on_step=on_step)
+    except LibraryResetCancelled:
+        print("\nCancelled - what was already written is left where it is.")
+        return
+    except KeyboardInterrupt:
+        print("\nStopped - what was already written is left where it is.")
+        return
+
+    print("\nDone.")
+    for name, count in results.items():
+        print(f"  {name}: {count}")
+
+
+if __name__ == "__main__":
+    main()
