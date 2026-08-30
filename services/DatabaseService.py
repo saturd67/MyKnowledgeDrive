@@ -18,6 +18,33 @@ class DatabaseService:
     def __init__(self, db_path=DB_PATH):
         self.db_path = db_path
 
+    def initialise(self):
+        """Creates and seeds every table. Called once, on app startup.
+
+        A table added later joins the list below and nothing else changes -
+        each repository still owns its own DDL, seed and migrations, and this
+        only decides that they all run, against this database, in this order.
+        Order matters once a table references another: a child table has to be
+        created after the parent it points at.
+
+        Safe to call more than once - every repository's `initialise` is.
+        """
+        # Imported here rather than at the top: every repository reaches
+        # DatabaseService through BaseRepository, so a module-level import
+        # would be a cycle.
+        from repository.SettingRepository import SettingRepository
+
+        repositories = [
+            SettingRepository(self),
+            # FileRepository(self),          # plans/file-table.md
+            # SyncRunRepository(self),       # plans/sync-run-table.md
+            # SyncRunFileRepository(self),   # after SyncRunRepository - it has the parent id
+        ]
+        for repository in repositories:
+            repository.initialise()
+
+        logger.info(f"Database ready: {self.db_path}")
+
     @contextmanager
     def connection(self):
         """Commits on success, rolls back on error, always closes."""

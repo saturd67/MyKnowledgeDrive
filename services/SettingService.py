@@ -16,8 +16,9 @@ class SettingService:
     """Reads and writes settings.
 
     There is no fallback to a value in code: a key that is missing or retired
-    is an error, not a default. Call `initialise()` once, on app startup,
-    before any read/write - it is not checked on every call.
+    is an error, not a default. `DatabaseService.initialise()` must have run
+    once, on app startup, before any read or write here - it is not checked on
+    every call.
 
     Nothing is cached: every read is a query, so a value written anywhere is
     visible on the next call.
@@ -25,10 +26,6 @@ class SettingService:
 
     def __init__(self, setting_repository=None):
         self.setting_repository = setting_repository or SettingRepository()
-
-    def initialise(self):
-        """Creates the table and seeds it if needed. Safe to call more than once."""
-        self.setting_repository.initialise()
 
     def find_active_by_key(self, key):
         """One active row, queried by key.

@@ -32,6 +32,15 @@ class BaseRepository:
     def db_path(self):
         return self.database_service.db_path
 
+    def initialise(self):
+        """Create this repository's table, and seed it if it needs seeding.
+
+        `DatabaseService.initialise()` calls this on every repository at
+        startup, so it has to be safe to run against a database that already
+        has the table.
+        """
+        raise NotImplementedError
+
     @staticmethod
     def current_datetime():
         """The machine's local time, for the audit columns."""

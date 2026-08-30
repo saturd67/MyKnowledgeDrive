@@ -7,7 +7,7 @@ layouts, and services/ for the code that does the real work.
 
 import flet as ft
 
-from services.SettingService import settingService
+from services.DatabaseService import DatabaseService
 from view import theme
 from view.main_view import TITLES, MainView
 
@@ -25,6 +25,6 @@ def main(page: ft.Page):
 
 if __name__ == "__main__":
     # Once per process, before any screen reads a setting. Creates and seeds
-    # the table if the database is new; reading before this fails loudly.
-    settingService.initialise()
+    # every table if the database is new; reading before this fails loudly.
+    DatabaseService().initialise()
     ft.run(main)
