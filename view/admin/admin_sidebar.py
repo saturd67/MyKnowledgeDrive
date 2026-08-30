@@ -1,80 +1,123 @@
 """Admin sidebar: brand header, navigation, connection footer.
 
-Presentation only - picking a nav item just moves the selected pill.
+Reads the selected screen off the portal it is given, and calls back into it -
+the reader beside it has to change with the same click.
 """
+
+from typing import TYPE_CHECKING
 
 import flet as ft
 
+from view.admin.screens.library_sync_view import LibrarySyncView
+from view.admin.screens.library_view import LibraryView
+from view.admin.screens.settings_view import SettingsView
 from view.theme import Radius, Space, palette
 from view.widgets.blocks.brand import BrandHeader
 from view.widgets.blocks.nav_item import NavItem
 from view.widgets.containers.pointer_area import PointerArea
 
-#: text, icon, selected icon
+if TYPE_CHECKING:
+    # Annotation-only: the portal imports this module, so a real import here
+    # would be a cycle.
+    from view.admin.admin_portal import AdminPortal
+
+#: text, icon, selected icon, the BaseView subclass the reader shows. One row
+#: rather than two lists, so a nav item and its screen cannot drift apart.
 NAV_ITEMS = [
-    ("Library", ft.Icons.TABLE_ROWS_OUTLINED, ft.Icons.TABLE_ROWS_ROUNDED),
-    ("Library Sync", ft.Icons.SYNC_OUTLINED, ft.Icons.SYNC_ROUNDED),
-    ("Settings", ft.Icons.TUNE_OUTLINED, ft.Icons.TUNE_ROUNDED),
+    ("Library", ft.Icons.TABLE_ROWS_OUTLINED, ft.Icons.TABLE_ROWS_ROUNDED, LibraryView),
+    ("Library Sync", ft.Icons.SYNC_OUTLINED, ft.Icons.SYNC_ROUNDED, LibrarySyncView),
+    ("Settings", ft.Icons.TUNE_OUTLINED, ft.Icons.TUNE_ROUNDED, SettingsView),
 ]
 
 WIDTH = 248
 
 
 class AdminSidebar(ft.Container):
+    """The column itself: its width, its fill and the rule down its right.
 
-    def __init__(self, on_navigate=None):
+    None of that changes when a screen is picked, so the panel inside is what
+    gets redrawn.
+    """
+
+    def __init__(self, admin_portal: "AdminPortal"):
         super().__init__()
-        self.on_navigate = on_navigate
-        self.index = 0
+        # No handing ourselves back: the portal builds this sidebar and keeps
+        # the reference, so it can already redraw us.
+        self.admin_portal = admin_portal
+        self.admin_panel = AdminPanel(admin_portal)
 
     def build(self):
         p = palette()
-
-        # Held so navigate() can refill just the rows rather than rebuild the
-        # whole sidebar - the header and footer never change.
-        self.nav_column = ft.Column(self._nav_items(), spacing=Space.XS)
-
         self.width = WIDTH
         self.bgcolor = p.sidebar
         self.border = ft.Border.only(right=ft.BorderSide(1, p.border))
-        self.content = ft.Column(
-            [
-                BrandHeader("Admin Portal"),
-                ft.Container(
-                    content=self.nav_column,
-                    padding=ft.Padding.symmetric(horizontal=Space.MD, vertical=Space.LG),
-                ),
-                ft.Container(expand=True),
-                ft.Container(height=1, bgcolor=p.border_soft),
-                ft.Container(content=self._footer(), padding=Space.LG),
-            ],
-            spacing=0,
-            expand=True,
-        )
+        self.content = self.admin_panel
 
-    def navigate(self, index):
-        self.index = index
-        self.nav_column.controls = self._nav_items()
-        self.nav_column.update()
-        if self.on_navigate is not None:
-            self.on_navigate(index)
+    def refresh(self):
+        self.admin_panel.refresh()
 
-    def _nav_items(self):
+
+class AdminPanel(ft.Column):
+    """What the sidebar holds: the brand, the nav rows and the store footer."""
+
+    def __init__(self, admin_portal: "AdminPortal"):
+        super().__init__()
+        self.admin_portal = admin_portal
+
+    def build(self):
+        self.controls = self._blocks()
+        self.spacing = 0
+        self.expand = True
+
+    def refresh(self):
+        self.controls = self._blocks()
+        self.update()
+
+    def _blocks(self):
         p = palette()
         return [
-            PointerArea(
-                NavItem(text, icon, selected_icon, is_selected=index == self.index),
-                on_click=lambda _, i=index: self.navigate(i),
-                # The selected row already has its pill - only the others light up.
-                hover_bgcolor=None if index == self.index else p.surface_high,
-            )
-            for index, (text, icon, selected_icon) in enumerate(NAV_ITEMS)
+            BrandHeader("Admin Portal"),
+            AdminNavList(self.admin_portal),
+            # Pushes the footer to the bottom whatever the nav runs to.
+            ft.Container(expand=True),
+            ft.Container(height=1, bgcolor=p.border_soft),
+            StoreFooter(),
         ]
 
-    @staticmethod
-    def _footer():
+
+class AdminNavList(ft.Container):
+    """One row per screen, with the selected one carrying the pill."""
+
+    def __init__(self, admin_portal: "AdminPortal"):
+        super().__init__()
+        self.admin_portal = admin_portal
+
+    def build(self):
         p = palette()
-        return ft.Column(
+        admin_portal = self.admin_portal
+
+        self.content = ft.Column(
+            [
+                PointerArea(
+                    NavItem(text, icon, selected_icon, is_selected=index == admin_portal.index),
+                    on_click=lambda _, i=index: admin_portal.navigate(i),
+                    # The selected row already has its pill - only the others
+                    # light up.
+                    hover_bgcolor=None if index == admin_portal.index else p.surface_high,
+                )
+                for index, (text, icon, selected_icon, _view_class) in enumerate(NAV_ITEMS)
+            ],
+            spacing=Space.XS,
+        )
+        self.padding = ft.Padding.symmetric(horizontal=Space.MD, vertical=Space.LG)
+
+
+class StoreFooter(ft.Container):
+    """Whether the store is reachable, and the model it was built with."""
+
+    def build(self):
+        p = palette()
+        self.content = ft.Column(
             [
                 ft.Row(
                     [
@@ -89,3 +132,4 @@ class AdminSidebar(ft.Container):
             ],
             spacing=Space.XS,
         )
+        self.padding = Space.LG
