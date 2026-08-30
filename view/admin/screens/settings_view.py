@@ -368,7 +368,7 @@ class PathsSectionCard(SectionCard):
             return
 
         try:
-            settingService.set_many(changes)
+            settingService.update_all(changes)
         except Exception as error:
             self.view.notify(self.SECTION_CARD_NAME,
                              f"Could not save paths: {error}", "danger")
@@ -490,7 +490,7 @@ class DriveSectionCard(SectionCard):
             return
 
         try:
-            settingService.set_many(changes)
+            settingService.update_all(changes)
         except Exception as error:
             self.view.notify(self.SECTION_CARD_NAME,
                              f"Could not save Drive settings: {error}", "danger")
@@ -605,7 +605,7 @@ class EmbeddingSectionCard(SectionCard):
             return
 
         try:
-            settingService.set_many(changes)
+            settingService.update_all(changes)
         except Exception as error:
             self.view.notify(self.SECTION_CARD_NAME,
                              f"Could not save embedding settings: {error}", "danger")

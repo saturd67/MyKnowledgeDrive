@@ -1,26 +1,22 @@
 import logging
 import sqlite3
 from contextlib import contextmanager
-from datetime import datetime, timezone
 from pathlib import Path
 
 from constant.paths import DB_PATH
 
 logger = logging.getLogger(__name__)
 
-TIMESTAMP_FORMAT = "%Y-%m-%dT%H:%M:%SZ"
-
 
 class DatabaseService:
-    """Connection handling only - the SQL lives in repository/."""
+    """Connection handling only - the SQL lives in repository/.
+
+    The audit timestamps are stamped by BaseRepository, which is what knows
+    when each column is written.
+    """
 
     def __init__(self, db_path=DB_PATH):
         self.db_path = db_path
-
-    @staticmethod
-    def now():
-        """The one timestamp format every table is stamped with."""
-        return datetime.now(timezone.utc).strftime(TIMESTAMP_FORMAT)
 
     @contextmanager
     def connection(self):
