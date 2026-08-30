@@ -1,7 +1,7 @@
 """Every SQL statement that touches the setting table.
 
-Nothing above this layer writes SQL: SettingService handles caching, path
-resolution and errors, and calls in here for the data.
+Nothing above this layer writes SQL: SettingService handles path resolution,
+errors and the all-settings cache, and calls in here for the data.
 """
 
 import logging
@@ -35,6 +35,19 @@ class SettingRepository:
                 )
             """)
             self._set_default_value_if_not_exist(connection, created_at)
+
+    def find_by_key_is_active(self, key, is_active):
+        """The value of the one active row for `key`, or None if there is none.
+
+        `value` is NOT NULL, so None can only mean the row is missing or
+        retired - the caller does not have to tell the two apart.
+        """
+        with self.database_service.connection() as connection:
+            row = connection.execute(
+                "SELECT value FROM setting WHERE key = ? AND is_active = ?",
+                (key, is_active),
+            ).fetchone()
+        return row["value"] if row else None
 
     def find_all_active(self):
         with self.database_service.connection() as connection:

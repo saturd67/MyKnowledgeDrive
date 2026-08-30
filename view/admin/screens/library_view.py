@@ -21,7 +21,7 @@ from view.widgets.buttons.ghost_button import GhostButton
 from view.widgets.buttons.icon_button import IconButton
 from view.widgets.containers.pill import Pill
 from view.widgets.containers.pointer_area import PointerArea
-from view.widgets.containers.section import Section
+from view.widgets.containers.section import SectionCard
 from view.widgets.feedback.empty_state import EmptyState
 from view.widgets.text.label import Label
 from view.widgets.text.mono import Mono
@@ -180,7 +180,7 @@ class LibraryStats(ft.Row):
         self.spacing = Space.LG
 
 
-class DocumentsSection(Section):
+class DocumentsSection(SectionCard):
     """The folder tree, its column header and the filter toolbar.
 
     Takes the screen rather than a pile of callbacks: it reads the filter and

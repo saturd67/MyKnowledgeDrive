@@ -5,7 +5,7 @@ from view.widgets.containers.card import Card
 from view.widgets.text.subtitle import Subtitle
 
 
-class Section(Card):
+class SectionCard(Card):
     """A titled card: heading row on top, arbitrary content below."""
 
     def __init__(self, title_text, subtitle_text=None, trailing=None, content=None,

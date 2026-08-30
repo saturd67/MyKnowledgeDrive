@@ -61,7 +61,7 @@ class LibraryResetService:
         self.input_dir = Path(input_dir or settingService.get_path(PATHS_INPUT_DIR))
         self.output_dir = Path(output_dir or settingService.get_path(PATHS_OUTPUT_DIR))
         self.chroma_store_dir = chroma_store_dir or settingService.get_path(PATHS_CHROMA_STORE)
-        self.collection_name = collection_name or settingService.get(EMBEDDING_COLLECTION)
+        self.collection_name = collection_name or settingService.find_active_by_key(EMBEDDING_COLLECTION)
 
     def start_reset(self, on_step=None, is_cancelled=None):
         """Runs the five steps in order and returns what each one did.
@@ -91,7 +91,7 @@ class LibraryResetService:
             self.output_dir,
             self.chroma_store_dir,
             self.collection_name,
-            settingService.get(EMBEDDING_MODEL),
+            settingService.find_active_by_key(EMBEDDING_MODEL),
         )
 
         self._start_step(4, on_step, is_cancelled)
@@ -110,10 +110,10 @@ class LibraryResetService:
 
     def _download(self):
         file_downloader_service = FileDownloaderService(
-            settingService.get(DRIVE_FOLDER_ID),
+            settingService.find_active_by_key(DRIVE_FOLDER_ID),
             self.input_dir,
             settingService.get_path(DRIVE_SERVICE_ACCOUNT_FILE),
-            settingService.get(DRIVE_SCOPE),
+            settingService.find_active_by_key(DRIVE_SCOPE),
         )
         return file_downloader_service.start_download()
 

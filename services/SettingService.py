@@ -18,7 +18,10 @@ class SettingService:
 
     There is no fallback to a value in code: a key that is missing or retired
     is an error, not a default. Call `initialise()` once, on app startup,
-    before any get/set - it is not checked on every call.
+    before any read/write - it is not checked on every call.
+
+    `findByKeyIsActive` queries the table per call. The cache behind
+    `get_all()` is only for reading every setting at once.
     """
 
     def __init__(self, setting_repository=None):
@@ -30,17 +33,22 @@ class SettingService:
         self.setting_repository.initialise(DatabaseService.now())
         self.reload()
 
-    def get(self, key):
-        values = self.get_all()
-        if key not in values:
+    def find_active_by_key(self, key):
+        """One active row, queried by key - it does not go through the cache.
+
+        Every call is a `SELECT`, so a caller reading the same key once per
+        file in a loop should hoist it out of the loop.
+        """
+        value = self.setting_repository.find_by_key_is_active(key, 1)
+        if value is None:
             raise SettingNotFoundError(
                 f"Setting '{key}' is not in the database. "
                 f"Delete {self.setting_repository.db_path} to rebuild it from the seed."
             )
-        return values[key]
+        return value
 
     def get_int(self, key):
-        value = self.get(key)
+        value = self.find_active_by_key(key)
         try:
             return int(value)
         except ValueError:
@@ -48,7 +56,7 @@ class SettingService:
 
     def get_path(self, key):
         """Absolute path for a path setting, resolved against BASE_DIR."""
-        value = self.get(key)
+        value = self.find_active_by_key(key)
         if key in RELATIVE_TO_BASE_DIR and not os.path.isabs(value):
             return os.path.join(BASE_DIR, value)
         return value

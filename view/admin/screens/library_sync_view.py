@@ -21,7 +21,7 @@ from view.widgets.containers.divider import Divider
 from view.widgets.containers.icon_badge import IconBadge
 from view.widgets.containers.pill import Pill
 from view.widgets.containers.pointer_area import PointerArea
-from view.widgets.containers.section import Section
+from view.widgets.containers.section import SectionCard
 from view.widgets.feedback.empty_state import EmptyState
 from view.widgets.text.mono import Mono
 
@@ -281,7 +281,7 @@ class SyncHeader(ft.Column):
         self.spacing = 0
 
 
-class ScanStepsSection(Section):
+class ScanStepsSection(SectionCard):
     """What a scan looks at, in order."""
 
     def __init__(self):
@@ -308,7 +308,7 @@ class ScanStepsSection(Section):
         )
 
 
-class ResetStepsSection(Section):
+class ResetStepsSection(SectionCard):
     """What a full rebuild does, in order."""
 
     def __init__(self):
@@ -335,7 +335,7 @@ class ResetStepsSection(Section):
         )
 
 
-class RunLogSection(Section):
+class RunLogSection(SectionCard):
     """Where the services' output streams while a run is in progress."""
 
     def __init__(self):

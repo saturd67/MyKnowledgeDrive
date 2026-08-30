@@ -15,10 +15,10 @@ class FileFetcherService:
     def __init__(self):
         # Read on construction, not at import time - the credentials file is
         # configurable now, and a missing one should fail the run, not the import.
-        self.folder_id = settingService.get(DRIVE_FOLDER_ID)
+        self.folder_id = settingService.find_active_by_key(DRIVE_FOLDER_ID)
         self.creds = Credentials.from_service_account_file(
             settingService.get_path(DRIVE_SERVICE_ACCOUNT_FILE),
-            scopes=[settingService.get(DRIVE_SCOPE)]
+            scopes=[settingService.find_active_by_key(DRIVE_SCOPE)]
         )
 
     def start_file_id_fetching(self):
