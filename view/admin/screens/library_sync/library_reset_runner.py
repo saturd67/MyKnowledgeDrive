@@ -142,7 +142,7 @@ class LibraryResetRunner:
             )
             self.handle_run_finish(results)
         except LibraryResetCancelled:
-            self.cancel_run_finished()
+            self.handle_cancel_run()
         except Exception as error:
             self.handle_run_fail(error)
         finally:
@@ -174,7 +174,7 @@ class LibraryResetRunner:
         self.step_number = STEP_COUNT
         self.on_safe_change()
 
-    def cancel_run_finished(self):
+    def handle_cancel_run(self):
         self.status = "cancelled"
         self.on_safe_change()
 
