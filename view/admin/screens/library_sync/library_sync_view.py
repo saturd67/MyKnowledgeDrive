@@ -403,24 +403,19 @@ class ScanStepsSection(ft.Column):
         )
 
     def steps_card(self):
-        # A 12-column grid split between the steps, with breakpoints so they
-        # wrap rather than run off the side. A plain Row with expanded children
-        # sizes each card to its own text, which overflows on a narrow window
-        # and simply clips the last step.
-        span = {"xs": 12, "md": 6, "xl": 12 / len(ScanStepsSection.SCAN_STAGES)}
         return SectionCard(
             "Scan steps",
             "What a scan looks at, in order. Nothing is written.",
             trailing=Pill("Idle", "neutral", ft.Icons.PAUSE_CIRCLE_OUTLINE_ROUNDED),
-            # Equal columns rather than a stack: the steps run left to right,
-            # so the pipeline is one line to read across.
-            content=ft.ResponsiveRow(
+            # One line to read across, scrolling sideways when it does not
+            # fit. See ResetStepsSection.steps_card for why it is not a grid.
+            content=ft.Row(
                 [
-                    StepCard(index, name, description, span)
+                    StepCard(index, name, description)
                     for index, (name, description) in enumerate(ScanStepsSection.SCAN_STAGES)
                 ],
                 spacing=Space.MD,
-                run_spacing=Space.MD,
+                scroll=ft.ScrollMode.AUTO,
                 vertical_alignment=ft.CrossAxisAlignment.START,
             ),
         )
@@ -491,25 +486,24 @@ class ResetStepsSection(ft.Column):
 
     def steps_card(self):
         stages = self.reset_stages()
-        # A 12-column grid split between the steps, with breakpoints so they
-        # wrap rather than run off the side. A plain Row with expanded children
-        # sizes each card to its own text, which overflows on a narrow window
-        # and simply clips the last step.
-        span = {"xs": 12, "md": 6, "xl": 12 / len(stages)}
         pill_text, pill_tone = self.runner.summary()
         return SectionCard(
             "Pipeline steps",
             "What a full rebuild does, in order.",
             trailing=Pill(pill_text, pill_tone, RUN_ICONS[pill_tone]),
-            # Equal columns rather than a stack: the steps run left to right,
-            # so the pipeline is one line to read across.
-            content=ft.ResponsiveRow(
+            # A fixed-width row that scrolls sideways, not a 12-column grid.
+            # The grid divided the window between all six steps, so on this
+            # window each card was narrow enough to break "Step 4" across four
+            # lines - the steps stayed on screen and stopped being readable.
+            # Scrolling keeps every card the same legible width and lets the
+            # pipeline run off the edge, which is what a pipeline does anyway.
+            content=ft.Row(
                 [
-                    StepCard(index, name, description, span, self.runner.step_status(index))
+                    StepCard(index, name, description, self.runner.step_status(index))
                     for index, (name, description) in enumerate(stages)
                 ],
                 spacing=Space.MD,
-                run_spacing=Space.MD,
+                scroll=ft.ScrollMode.AUTO,
                 vertical_alignment=ft.CrossAxisAlignment.START,
             ),
         )

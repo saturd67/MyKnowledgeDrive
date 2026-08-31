@@ -8,6 +8,12 @@ from view.widgets.containers.pill import Pill
 # capped to match.
 STEP_CARD_HEIGHT = 132
 
+# And fixed width, because the pipeline scrolls sideways rather than dividing
+# the window between however many steps there are. A card narrow enough to
+# break "Step 4" across four lines is not a smaller card, it is an unreadable
+# one - past a certain point the row has to run off the edge instead.
+STEP_CARD_WIDTH = 240
+
 #: status -> (icon, pill text, tone). `running` carries no icon: it gets a
 #: spinner instead, which is a control rather than an icon name.
 STEP_STATUSES = {
@@ -26,12 +32,11 @@ class StepCard(ft.Container):
     `done`, `failed`, or `skipped` for the steps a stopped run never reached.
     """
 
-    def __init__(self, index, name, description, span, status="pending"):
+    def __init__(self, index, name, description, status="pending"):
         super().__init__()
         self.index = index
         self.name = name
         self.description = description
-        self.col = span
         self.status = status
 
     def build(self):
@@ -67,6 +72,7 @@ class StepCard(ft.Container):
             spacing=2,
         )
         self.padding = Space.MD
+        self.width = STEP_CARD_WIDTH
         self.height = STEP_CARD_HEIGHT
         self.bgcolor = p.surface_alt
         self.border = ft.Border.all(1, p.border_soft)
