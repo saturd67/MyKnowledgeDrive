@@ -47,26 +47,6 @@ MODES = [
     ("reset", "Reset", ft.Icons.RESTART_ALT_ROUNDED),
 ]
 
-SCAN_STAGES = [
-    ("Walk the local mirror", "Compares each source file's mtime to its converted .txt."),
-    ("Fetch Drive listing", "Recursive read-only walk of the configured Drive folder."),
-    ("Diff against the collection",
-     "Splits the listing into added, updated, removed and unchanged."),
-]
-
-#: What each of the five reset steps does. The steps are *named* by
-#: `LibraryResetService.STEPS` and only explained here - a second copy of the
-#: names would drift from the ones `on_step` hands back.
-RESET_DESCRIPTIONS = [
-    "{input_dir} is deleted and recreated, so nothing an earlier run left "
-    "survives into this one.",
-    "Every supported file in the Drive folder is re-downloaded to {input_dir}.",
-    "{output_dir} is deleted and recreated.",
-    "Each .docx and image is OCR'd again from scratch.",
-    "The Chroma collection is deleted and recreated.",
-    "All converted text is embedded back into the store.",
-]
-
 #: label, the result keys summed into it, tone.
 RESULT_TILES = [
     ("Downloaded", ("downloaded",), "primary"),
@@ -86,24 +66,6 @@ RUN_ICONS = {
     "danger": ft.Icons.ERROR_ROUNDED,
 }
 
-
-def reset_stages():
-    """The five steps, named by the service and described here.
-
-    The two paths are read from the setting table rather than written into the
-    text: telling someone a reset will clear a folder it is not going to touch
-    is worse than saying nothing.
-    """
-    values = {
-        "input_dir": settingService.find_active_by_key(PATHS_INPUT_DIR),
-        "output_dir": settingService.find_active_by_key(PATHS_OUTPUT_DIR),
-    }
-    return [
-        (name, description.format(**values))
-        for name, description in zip(LibraryResetService.STEPS, RESET_DESCRIPTIONS)
-    ]
-
-
 class LibrarySyncView(BaseView):
 
     def __init__(self, portal=None):
@@ -122,11 +84,11 @@ class LibrarySyncView(BaseView):
         # own hook, so a line does not rebuild the screen hundreds of times.
         self.runner.on_change = self.refresh
         self.runner.on_log = self.refresh_log
-        self.body_container.content = self._layout()
+        self.body_container.content = self.build_layout()
         return self.body_container
 
     def refresh(self):
-        self.body_container.content = self._layout()
+        self.body_container.content = self.build_layout()
         send_update(self.body_container)
 
     def refresh_log(self):
@@ -157,7 +119,7 @@ class LibrarySyncView(BaseView):
 
     # --- layout --------------------------------------------------------------
 
-    def _layout(self):
+    def build_layout(self):
         blocks = [
             SyncHeader(self.mode, self.runner, self.select_mode,
                        self._open_dialog, self.cancel_reset),
@@ -409,12 +371,19 @@ class SyncHeader(ft.Column):
 class ScanStepsSection(SectionCard):
     """What a scan looks at, in order."""
 
+    SCAN_STAGES = [
+        ("Walk the local mirror", "Compares each source file's mtime to its converted .txt."),
+        ("Fetch Drive listing", "Recursive read-only walk of the configured Drive folder."),
+        ("Diff against the collection",
+        "Splits the listing into added, updated, removed and unchanged."),
+    ]
+
     def __init__(self):
         # A 12-column grid split between the steps, with breakpoints so they
         # wrap rather than run off the side. A plain Row with expanded children
         # sizes each card to its own text, which overflows on a narrow window
         # and simply clips the last step.
-        span = {"xs": 12, "md": 6, "xl": 12 / len(SCAN_STAGES)}
+        span = {"xs": 12, "md": 6, "xl": 12 / len(ScanStepsSection.SCAN_STAGES)}
         super().__init__(
             "Scan steps",
             "What a scan looks at, in order. Nothing is written.",
@@ -424,7 +393,7 @@ class ScanStepsSection(SectionCard):
             content=ft.ResponsiveRow(
                 [
                     StepCard(index, name, description, span)
-                    for index, (name, description) in enumerate(SCAN_STAGES)
+                    for index, (name, description) in enumerate(ScanStepsSection.SCAN_STAGES)
                 ],
                 spacing=Space.MD,
                 run_spacing=Space.MD,
@@ -436,8 +405,21 @@ class ScanStepsSection(SectionCard):
 class ResetStepsSection(SectionCard):
     """What a full rebuild does, in order, and where the run has got to."""
 
+    #: What each of the five reset steps does. The steps are *named* by
+    #: `LibraryResetService.STEPS` and only explained here - a second copy of the
+    #: names would drift from the ones `on_step` hands back.
+    RESET_DESCRIPTIONS = [
+        "{input_dir} is deleted and recreated, so nothing an earlier run left "
+        "survives into this one.",
+        "Every supported file in the Drive folder is re-downloaded to {input_dir}.",
+        "{output_dir} is deleted and recreated.",
+        "Each .docx and image is OCR'd again from scratch.",
+        "The Chroma collection is deleted and recreated.",
+        "All converted text is embedded back into the store.",
+    ]
+
     def __init__(self, runner):
-        stages = reset_stages()
+        stages = self._reset_stages()
         # A 12-column grid split between the steps, with breakpoints so they
         # wrap rather than run off the side. A plain Row with expanded children
         # sizes each card to its own text, which overflows on a narrow window
@@ -460,6 +442,24 @@ class ResetStepsSection(SectionCard):
                 vertical_alignment=ft.CrossAxisAlignment.START,
             ),
         )
+
+    def _reset_stages(self):
+        """The five steps, named by the service and described here.
+
+        The two paths are read from the setting table rather than written into the
+        text: telling someone a reset will clear a folder it is not going to touch
+        is worse than saying nothing.
+        """
+
+        values = {
+            "input_dir": settingService.find_active_by_key(PATHS_INPUT_DIR),
+            "output_dir": settingService.find_active_by_key(PATHS_OUTPUT_DIR),
+        }
+        return [
+            (name, description.format(**values))
+            for name, description in zip(LibraryResetService.STEPS, ResetStepsSection.RESET_DESCRIPTIONS)
+        ]
+
 
 
 class ResultsSection(SectionCard):
