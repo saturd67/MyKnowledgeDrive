@@ -9,12 +9,18 @@ image converter and the embedder. They take their folders as arguments rather
 than reading the setting table themselves, so this is where the settings are
 read and handed to them.
 
-    resources\files            <- step 1 downloads Drive into here
-    resources\converted_files  <- step 2 clears it, step 3 fills it
-    the chroma store           <- step 4 empties, step 5 refills
+    resources\files            <- step 1 clears it, step 2 downloads Drive into it
+    resources\converted_files  <- step 3 clears it, step 4 fills it
+    the chroma store           <- step 5 empties, step 6 refills
 
-Sources are never rewritten: the images are read out of the copy in
-converted_files, so a rebuild can always start again from what was downloaded.
+Every one of the three is emptied before it is refilled, so a reset is a
+rebuild from Drive rather than a merge over what an earlier run left behind -
+a file removed upstream disappears here too.
+
+That also means the local mirror is gone the moment step 1 runs: a reset that
+fails at step 2 leaves no sources to fall back on, and has to be run again
+once Drive is reachable. Conversion still never rewrites the sources - the
+images are read out of the copy in converted_files.
 """
 
 import logging
@@ -50,6 +56,7 @@ class LibraryResetService:
     """
 
     STEPS = (
+        "Clear downloaded files",
         "Download from Drive",
         "Clear converted files",
         "Convert every source file",
@@ -64,7 +71,7 @@ class LibraryResetService:
         self.collection_name = collection_name or settingService.find_active_by_key(EMBEDDING_COLLECTION)
 
     def start_reset(self, on_step=None, is_cancelled=None):
-        """Runs the five steps in order and returns what each one did.
+        """Runs the six steps in order and returns what each one did.
 
         `on_step(step_number, step_name)` is called as each step starts, and
         `is_cancelled()` is checked between steps - a run that is cancelled
@@ -73,15 +80,18 @@ class LibraryResetService:
         results = {}
 
         self._start_step(1, on_step, is_cancelled)
+        self._clear_downloaded_files()
+
+        self._start_step(2, on_step, is_cancelled)
         downloaded_file_count, skipped_file_count, failed_file_count = self._download()
         results["downloaded"] = downloaded_file_count
         results["download_skipped"] = skipped_file_count
         results["download_failed"] = failed_file_count
 
-        self._start_step(2, on_step, is_cancelled)
+        self._start_step(3, on_step, is_cancelled)
         self._clear_converted_files()
 
-        self._start_step(3, on_step, is_cancelled)
+        self._start_step(4, on_step, is_cancelled)
         converted_file_count, converted_image_count, _, image_failed_file_count = self._convert()
         results["converted"] = converted_file_count
         results["converted_images"] = converted_image_count
@@ -94,10 +104,10 @@ class LibraryResetService:
             settingService.find_active_by_key(EMBEDDING_MODEL),
         )
 
-        self._start_step(4, on_step, is_cancelled)
+        self._start_step(5, on_step, is_cancelled)
         file_embedder_service.reset_collection()
 
-        self._start_step(5, on_step, is_cancelled)
+        self._start_step(6, on_step, is_cancelled)
         embedded_file_count, embed_skipped_file_count, embed_failed_file_count = (
             file_embedder_service.start_embedding()
         )
@@ -116,6 +126,18 @@ class LibraryResetService:
             settingService.find_active_by_key(DRIVE_SCOPE),
         )
         return file_downloader_service.start_download()
+
+    def _clear_downloaded_files(self):
+        """Empties the source folder, so what an earlier run left is gone.
+
+        Without this, a file deleted or renamed in Drive stays on disk, gets
+        converted and embedded again, and the collection keeps a document that
+        no longer exists upstream. The download that follows is a fresh copy,
+        not a merge over the old one.
+        """
+        logger.info(f"Clearing: {self.input_dir}")
+        shutil.rmtree(self.input_dir, ignore_errors=True)
+        self.input_dir.mkdir(parents=True, exist_ok=True)
 
     def _clear_converted_files(self):
         logger.info(f"Clearing: {self.output_dir}")
