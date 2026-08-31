@@ -121,8 +121,7 @@ class LibrarySyncView(BaseView):
 
     def build_layout(self):
         blocks = [
-            SyncHeader(self.mode, self.runner, self.select_mode,
-                       self._open_dialog, self.cancel_reset),
+            SyncHeader(self.mode, self.runner, self.select_mode),
             ft.Container(height=Space.XL),
         ]
 
@@ -133,14 +132,13 @@ class LibrarySyncView(BaseView):
                               on_hide=self.dismiss_error),
                     ft.Container(height=Space.LG),
                 ]
-            blocks.append(ResetStepsSection(self.runner))
-            if self.runner.results:
-                blocks += [ft.Container(height=Space.LG), ResultsSection(self.runner.results)]
+            section = ResetStepsSection(self.runner, self._open_dialog, self.cancel_reset)
         else:
-            blocks.append(ScanStepsSection())
+            section = ScanStepsSection(self.runner)
 
-        self.run_log_section = RunLogSection(self.runner)
-        blocks += [ft.Container(height=Space.LG), self.run_log_section]
+        # The mode's section owns its own log, so take whichever one is showing.
+        self.run_log_section = section.run_log_section
+        blocks.append(section)
 
         return ft.Column(blocks, spacing=0)
 
@@ -283,15 +281,17 @@ class LibrarySyncView(BaseView):
 
 
 class SyncHeader(ft.Column):
-    """Heading, description, the run button and the mode switch."""
+    """Heading, description and the mode switch.
 
-    def __init__(self, mode, runner, on_select_mode, on_reset, on_cancel):
+    The run button is not here - it belongs to the mode's own section below,
+    beside the steps it starts.
+    """
+
+    def __init__(self, mode, runner, on_select_mode):
         super().__init__()
         self.mode = mode
         self.runner = runner
         self.on_select_mode = on_select_mode
-        self.on_reset = on_reset
-        self.on_cancel = on_cancel
 
     def build(self):
         p = palette()
@@ -299,8 +299,6 @@ class SyncHeader(ft.Column):
         if self.mode == "reset":
             heading = "Reset library"
             description = "Full rebuild - use it for a first run or when the store is out of sync."
-            action = PrimaryButton("Reset library", icon=ft.Icons.DELETE_FOREVER_ROUNDED,
-                                   tone_name="danger", on_click=self.on_reset)
 
             if self.runner.is_running:
                 if self.runner.cancel_requested:
@@ -308,17 +306,12 @@ class SyncHeader(ft.Column):
                     # running has to finish. Saying so beats a button that
                     # looks broken for the next two minutes.
                     description = "Cancelling - the step already running has to finish first."
-                    action = GhostButton("Cancelling...", icon=ft.Icons.HOURGLASS_TOP_ROUNDED)
-                    action.disabled = True
                 else:
                     description = (f"Step {self.runner.step_number or 1} of {STEP_COUNT} - "
                                    "leaving this screen will not stop it.")
-                    action = GhostButton("Cancel", icon=ft.Icons.STOP_CIRCLE_OUTLINED,
-                                         on_click=self.on_cancel)
         else:
             heading = "Sync library"
             description = "Scan for what changed, then update only the files you pick."
-            action = PrimaryButton("Scan for changes", icon=ft.Icons.MANAGE_SEARCH_ROUNDED)
 
         tabs = []
         for key, text, icon in MODES:
@@ -350,11 +343,14 @@ class SyncHeader(ft.Column):
                 )
             )
 
+        # The switch sits in the header's action slot: it picks which screen
+        # you are on, which is a heading-level choice. What each mode *does* is
+        # its own button, down beside the steps it runs.
         self.controls = [
-            PageHeader(heading, description, actions=[action]),
-            ft.Container(height=Space.LG),
-            ft.Row(
-                [
+            PageHeader(
+                heading,
+                description,
+                actions=[
                     ft.Container(
                         content=ft.Row(tabs, spacing=Space.XS),
                         padding=Space.XS,
@@ -362,14 +358,19 @@ class SyncHeader(ft.Column):
                         border=ft.Border.all(1, p.border_soft),
                         border_radius=Radius.MD,
                     )
-                ]
+                ],
             ),
         ]
         self.spacing = 0
 
 
-class ScanStepsSection(SectionCard):
-    """What a scan looks at, in order."""
+class ScanStepsSection(ft.Column):
+    """Everything Sync mode shows below the header.
+
+    Its own run button, the steps a scan walks, and its own run log - the two
+    modes do not share one, so switching between them does not carry the
+    other's output across.
+    """
 
     SCAN_STAGES = [
         ("Walk the local mirror", "Compares each source file's mtime to its converted .txt."),
@@ -378,13 +379,36 @@ class ScanStepsSection(SectionCard):
         "Splits the listing into added, updated, removed and unchanged."),
     ]
 
-    def __init__(self):
+    def __init__(self, runner):
+        super().__init__()
+        self.runner = runner
+        # Held so the screen can push log lines into it without a full redraw.
+        self.run_log_section = RunLogSection(runner)
+
+    def build(self):
+        self.controls = [
+            self.action_row(),
+            ft.Container(height=Space.LG),
+            self.steps_card(),
+            ft.Container(height=Space.LG),
+            self.run_log_section,
+        ]
+        self.spacing = 0
+
+    @staticmethod
+    def action_row():
+        """Nothing behind it yet - Sync needs a `file` table and a planner."""
+        return ft.Row(
+            [PrimaryButton("Scan for changes", icon=ft.Icons.MANAGE_SEARCH_ROUNDED)]
+        )
+
+    def steps_card(self):
         # A 12-column grid split between the steps, with breakpoints so they
         # wrap rather than run off the side. A plain Row with expanded children
         # sizes each card to its own text, which overflows on a narrow window
         # and simply clips the last step.
         span = {"xs": 12, "md": 6, "xl": 12 / len(ScanStepsSection.SCAN_STAGES)}
-        super().__init__(
+        return SectionCard(
             "Scan steps",
             "What a scan looks at, in order. Nothing is written.",
             trailing=Pill("Idle", "neutral", ft.Icons.PAUSE_CIRCLE_OUTLINE_ROUNDED),
@@ -402,8 +426,13 @@ class ScanStepsSection(SectionCard):
         )
 
 
-class ResetStepsSection(SectionCard):
-    """What a full rebuild does, in order, and where the run has got to."""
+class ResetStepsSection(ft.Column):
+    """Everything Reset mode shows below the header.
+
+    The run button, the six pipeline steps and where the run has got to, what
+    the last finished run did, and the log it wrote - one class, because they
+    all read the same runner and change together on every step boundary.
+    """
 
     #: What each of the five reset steps does. The steps are *named* by
     #: `LibraryResetService.STEPS` and only explained here - a second copy of the
@@ -418,15 +447,57 @@ class ResetStepsSection(SectionCard):
         "All converted text is embedded back into the store.",
     ]
 
-    def __init__(self, runner):
-        stages = self._reset_stages()
+    def __init__(self, runner, on_reset, on_cancel):
+        super().__init__()
+        self.runner = runner
+        self.on_reset = on_reset
+        self.on_cancel = on_cancel
+        # Held so the screen can push log lines into it without a full redraw.
+        self.run_log_section = RunLogSection(runner)
+
+    def build(self):
+        controls = [
+            self.action_row(),
+            ft.Container(height=Space.LG),
+            self.steps_card(),
+        ]
+        if self.runner.results:
+            controls += [ft.Container(height=Space.LG), self.results_card()]
+        controls += [ft.Container(height=Space.LG), self.run_log_section]
+
+        self.controls = controls
+        self.spacing = 0
+
+    def action_row(self):
+        """Reset, or the two shapes Cancel takes once a run is going."""
+        if not self.runner.is_running:
+            return ft.Row([
+                PrimaryButton("Reset library", icon=ft.Icons.DELETE_FOREVER_ROUNDED,
+                              tone_name="danger", on_click=self.on_reset)
+            ])
+
+        if self.runner.cancel_requested:
+            # Cancel is only checked between steps, so the one already running
+            # has to finish. A disabled button that says so beats one that
+            # looks broken for the next two minutes.
+            cancelling_button = GhostButton("Cancelling...",
+                                            icon=ft.Icons.HOURGLASS_TOP_ROUNDED)
+            cancelling_button.disabled = True
+            return ft.Row([cancelling_button])
+
+        return ft.Row([
+            GhostButton("Cancel", icon=ft.Icons.STOP_CIRCLE_OUTLINED, on_click=self.on_cancel)
+        ])
+
+    def steps_card(self):
+        stages = self.reset_stages()
         # A 12-column grid split between the steps, with breakpoints so they
         # wrap rather than run off the side. A plain Row with expanded children
         # sizes each card to its own text, which overflows on a narrow window
         # and simply clips the last step.
         span = {"xs": 12, "md": 6, "xl": 12 / len(stages)}
-        pill_text, pill_tone = runner.summary()
-        super().__init__(
+        pill_text, pill_tone = self.runner.summary()
+        return SectionCard(
             "Pipeline steps",
             "What a full rebuild does, in order.",
             trailing=Pill(pill_text, pill_tone, RUN_ICONS[pill_tone]),
@@ -434,7 +505,7 @@ class ResetStepsSection(SectionCard):
             # so the pipeline is one line to read across.
             content=ft.ResponsiveRow(
                 [
-                    StepCard(index, name, description, span, runner.step_status(index))
+                    StepCard(index, name, description, span, self.runner.step_status(index))
                     for index, (name, description) in enumerate(stages)
                 ],
                 spacing=Space.MD,
@@ -443,7 +514,25 @@ class ResetStepsSection(SectionCard):
             ),
         )
 
-    def _reset_stages(self):
+    def results_card(self):
+        """The counts the run reported, once one has finished."""
+        span = {"xs": 6, "md": 4, "xl": 2}
+        return SectionCard(
+            "Last run",
+            "Counts reported by the three services this run drove.",
+            content=ft.ResponsiveRow(
+                [
+                    ResultTile(label,
+                               sum(self.runner.results.get(key, 0) for key in keys),
+                               tone_name, span)
+                    for label, keys, tone_name in RESULT_TILES
+                ],
+                spacing=Space.MD,
+                run_spacing=Space.MD,
+            ),
+        )
+
+    def reset_stages(self):
         """The five steps, named by the service and described here.
 
         The two paths are read from the setting table rather than written into the
@@ -460,25 +549,6 @@ class ResetStepsSection(SectionCard):
             for name, description in zip(LibraryResetService.STEPS, ResetStepsSection.RESET_DESCRIPTIONS)
         ]
 
-
-
-class ResultsSection(SectionCard):
-    """What the run that just finished actually did."""
-
-    def __init__(self, results):
-        span = {"xs": 6, "md": 4, "xl": 2}
-        super().__init__(
-            "Last run",
-            "Counts reported by the three services this run drove.",
-            content=ft.ResponsiveRow(
-                [
-                    ResultTile(label, sum(results.get(key, 0) for key in keys), tone_name, span)
-                    for label, keys, tone_name in RESULT_TILES
-                ],
-                spacing=Space.MD,
-                run_spacing=Space.MD,
-            ),
-        )
 
 
 class ResultTile(ft.Container):
