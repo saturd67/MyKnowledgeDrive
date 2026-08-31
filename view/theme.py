@@ -53,7 +53,7 @@ class Field:
 class Window:
     """Shared geometry - both portals run in the same window."""
     WIDTH = 1280
-    HEIGHT = 840
+    HEIGHT = 740
     MIN_WIDTH = 1040
     MIN_HEIGHT = 700
 

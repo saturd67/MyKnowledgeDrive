@@ -9,6 +9,7 @@ from typing import TYPE_CHECKING
 import flet as ft
 
 from view.theme import Radius, Space, palette, tone
+from view.ui_thread import send_update
 from view.widgets.blocks.brand import BrandHeader
 from view.widgets.blocks.file_icon import FileIcon
 from view.widgets.buttons.icon_button import IconButton
@@ -75,7 +76,7 @@ class SearchPanel(ft.Column):
 
     def refresh(self):
         self.controls = self._blocks()
-        self.update()
+        send_update(self)
 
     def _blocks(self):
         p = palette()
@@ -154,14 +155,24 @@ class SearchPanel(ft.Column):
             content=ft.Row(
                 [
                     ft.Container(content=Label("Results"), expand=True),
-                    (Pill(str(len(search_view.results())), "success") if search_view.is_searched
-                     else ft.Container()),
+                    self._results_pill(),
                 ],
                 vertical_alignment=ft.CrossAxisAlignment.CENTER,
             ),
             padding=ft.Padding.only(left=Space.MD, right=Space.MD, top=Space.MD,
                                     bottom=Space.SM),
         )
+
+    def _results_pill(self):
+        """The count, or what the search is doing instead of having one."""
+        search_view = self.search_view
+        if search_view.is_searching:
+            return Pill("searching", "primary")
+        if search_view.status == "failed":
+            return Pill("failed", "danger")
+        if search_view.is_searched:
+            return Pill(str(len(search_view.results())), "success")
+        return ft.Container()
 
     def _results_list(self):
         p = palette()
@@ -172,6 +183,22 @@ class SearchPanel(ft.Column):
                 ft.Icons.TRAVEL_EXPLORE_ROUNDED,
                 "No search yet",
                 "Matching files will be listed here, closest first.",
+                height=200,
+            )
+
+        if search_view.is_searching:
+            return EmptyState(
+                ft.Icons.HOURGLASS_TOP_ROUNDED,
+                "Searching ...",
+                "The first search of a session loads the embedding model.",
+                height=200,
+            )
+
+        if not search_view.results():
+            return EmptyState(
+                ft.Icons.SEARCH_OFF_ROUNDED,
+                "No matches",
+                "Nothing in the collection came back for that.",
                 height=200,
             )
 
@@ -203,11 +230,6 @@ class SearchHit(ft.Container):
         self.is_selected = is_selected
 
     @staticmethod
-    def score(distance):
-        """Rough 0..1 relevance for display purposes only."""
-        return max(0.0, min(1.0, 1.0 - distance))
-
-    @staticmethod
     def score_tone(score):
         if score >= 0.65:
             return tone("success")[0]
@@ -217,8 +239,7 @@ class SearchHit(ft.Container):
 
     def build(self):
         p = palette()
-        folder, _, name = self.result["label"].rpartition("\\")
-        score = self.score(self.result["distance"])
+        score = self.result.score
         score_color = self.score_tone(score)
 
         self.content = ft.Row(
@@ -228,12 +249,12 @@ class SearchHit(ft.Container):
                                     color=p.primary if self.is_selected else p.text_faint),
                     width=12,
                 ),
-                FileIcon(self.result["kind"], size=32),
+                FileIcon(self.result.kind, size=32),
                 ft.Column(
                     [
-                        ft.Text(name, size=12, weight=ft.FontWeight.W_600, color=p.text,
+                        ft.Text(self.result.name, size=12, weight=ft.FontWeight.W_600, color=p.text,
                                 max_lines=1, overflow=ft.TextOverflow.ELLIPSIS),
-                        ft.Text(folder or "(root)", size=10, color=p.text_faint,
+                        ft.Text(self.result.folder or "(root)", size=10, color=p.text_faint,
                                 max_lines=1, overflow=ft.TextOverflow.ELLIPSIS),
                         ft.Container(height=3),
                         ft.Row(

@@ -170,8 +170,8 @@ class EmbeddingSettings:
 
 class SettingsView(BaseView):
 
-    def __init__(self):
-        super().__init__()
+    def __init__(self, portal=None):
+        super().__init__(portal)
         # The three cards' values, held here rather than on the cards - a card
         # is rebuilt on every redraw, and what you typed has to outlive that.
         self.paths = PathsSettings()

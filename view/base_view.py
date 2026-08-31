@@ -6,7 +6,10 @@ to keep per-build scratch state on the instance instead of threading it
 through every helper.
 
 Subclasses put their markup in `build()` and everything it needs in private
-methods; the shell only ever calls `ViewClass().build()`.
+methods; the shell only ever calls `ViewClass(portal).build()`.
+
+State that has to survive that rebuild - unsaved edits, a run in progress -
+belongs on the portal, which the screen is handed for exactly that reason.
 """
 
 from abc import ABC, abstractmethod
@@ -23,7 +26,10 @@ class BaseView(ABC):
     #: keeps its scrollbar inside that list.
     scrolls = True
 
-    def __init__(self):
+    def __init__(self, portal=None):
+        #: The portal showing this screen - where anything that has to outlive
+        #: one build is kept. None only in a test that builds a screen alone.
+        self.portal = portal
         # Light mode only, and the instance is thrown away after one build,
         # so reading the tokens once here is enough.
         self.p = palette()

@@ -4,21 +4,25 @@ The screen owns the state both sides share and the reading pane itself. The
 sidebar is built by `UserPortal` and hands itself back here, so the two talk
 directly from then on - picking a hit redraws each of them.
 
-Presentation only - no query reaches TextEmbedderService. Any non-empty query
-returns the same ranked hits, the way a vector search would rather than a
-substring match, and Open in Drive is not wired up.
+A query goes to `SearchService`, which embeds it with the same model the
+documents were embedded with. That model loads on the first search of a
+process and takes seconds, so a search runs on a worker thread and the screen
+draws a searching state meanwhile. Open in Drive is not wired up.
 """
 
 import flet as ft
 
+from services.search_service.search_service import searchService
 from view.base_view import BaseView
 from view.theme import Radius, Space, palette
+from view.ui_thread import is_mounted, send_update
 from view.user.search_sidebar import SearchSidebar
 from view.widgets.blocks.brand import BrandHeader
 from view.widgets.blocks.file_icon import FileIcon
 from view.widgets.buttons.icon_button import IconButton
 from view.widgets.buttons.primary_button import PrimaryButton
 from view.widgets.containers.card import Card
+from view.widgets.containers.icon_badge import IconBadge
 from view.widgets.containers.pill import Pill
 from view.widgets.feedback.empty_state import EmptyState
 from view.widgets.text.label import Label
@@ -29,145 +33,65 @@ from view.widgets.text.mono import Mono
 #: lands on the same line.
 HEADER_HEIGHT = BrandHeader.HEIGHT
 
-#: Stand-ins for what TextEmbedderService.query() would return.
-SEARCH_RESULTS = [
-    {
-        "id": "4aB0kDsXz5YcMe2GaIrRf7LjUp3WtHvBr",
-        "label": "Linux\\SSH & SFTP\\SSH Tunnel",
-        "kind": "doc",
-        "distance": 0.2841,
-        "modified": "2026-05-18 09:41",
-        "snippet": "Local port forwarding: ssh -L 8080:localhost:80 user@host. Reverse tunnel "
-                   "exposes a local service on the remote side with -R ...",
-    },
-    {
-        "id": "5cD1lEtYa6ZdNf3HbJsSg8MkVq4XuIwCs",
-        "label": "Linux\\SSH & SFTP\\SSH with Private Key",
-        "kind": "doc",
-        "distance": 0.3517,
-        "modified": "2026-04-02 16:07",
-        "snippet": "Generate the pair with ssh-keygen -t ed25519, copy the public half to "
-                   "~/.ssh/authorized_keys and tighten permissions to 600 ...",
-    },
-    {
-        "id": "6eF2mFuZb7AeOg4IcKtTh9NlWr5YvJxDt",
-        "label": "Linux\\Firewall",
-        "kind": "doc",
-        "distance": 0.4880,
-        "modified": "2026-03-27 11:22",
-        "snippet": "firewall-cmd --add-port=22/tcp --permanent then reload. Check the active "
-                   "zone before opening anything on a public interface ...",
-    },
-    {
-        "id": "8iJ4oHwBd9CgQi6KeMvVj1PnYt7AxLzFv",
-        "label": "Linux\\Linux Path Cheatsheet",
-        "kind": "image",
-        "distance": 0.6123,
-        "modified": "2026-01-14 20:55",
-        "snippet": "-----img start----- /etc holds configuration, /var holds variable state, "
-                   "/opt holds optional add-on packages ----- img end -----",
-    },
-    {
-        "id": "0mN6qJyDf1EiSk8MgOxXl3RpAv9CzNbHx",
-        "label": "Networking\\8 Popular Network Protocols",
-        "kind": "image",
-        "distance": 0.7402,
-        "modified": "2025-11-08 13:30",
-        "snippet": "HTTP, HTTPS, FTP, SMTP, SSH, DNS, DHCP, TCP - what each one is for and "
-                   "which OSI layer it sits on ...",
-    },
-]
+#: Bullets in the converted markdown start with one of these.
+BULLET_MARKERS = ("- ", "* ", "+ ")
 
-#: document id -> the converted text, as (block kind, text) pairs.
-FILE_CONTENT = {
-    "4aB0kDsXz5YcMe2GaIrRf7LjUp3WtHvBr": [
-        ("h1", "SSH Tunnel"),
-        ("p", "A tunnel carries a TCP port over an existing SSH session, so a service that "
-              "only listens on localhost can still be reached from the other end."),
-        ("h2", "Local port forwarding"),
-        ("p", "Opens a port on my machine and forwards it to a host the server can see."),
-        ("code", "ssh -L 8080:localhost:80 user@host"),
-        ("bullet", "8080 is the port opened locally."),
-        ("bullet", "localhost:80 is resolved on the server, not here."),
-        ("bullet", "Add -N to forward only, without opening a shell."),
-        ("h2", "Reverse tunnel"),
-        ("p", "The opposite direction - exposes a local service on the remote side, which is "
-              "how a machine behind NAT is reached."),
-        ("code", "ssh -R 9000:localhost:3000 user@host"),
-        ("p", "GatewayPorts must be set to yes in sshd_config for the remote port to accept "
-              "anything other than loopback connections."),
-        ("h2", "Keeping it up"),
-        ("code", "ssh -NL 5432:db-internal:5432 user@host -o ServerAliveInterval=30"),
-        ("bullet", "ServerAliveInterval stops an idle tunnel from being dropped."),
-        ("bullet", "autossh restarts the tunnel when the link goes down."),
-    ],
-    "5cD1lEtYa6ZdNf3HbJsSg8MkVq4XuIwCs": [
-        ("h1", "SSH with Private Key"),
-        ("p", "Key based login replaces the password prompt and is what every server ends up "
-              "using once password authentication is turned off."),
-        ("h2", "Generate the pair"),
-        ("code", "ssh-keygen -t ed25519 -C \"laptop\""),
-        ("bullet", "Private half stays in ~/.ssh/id_ed25519 and never leaves the machine."),
-        ("bullet", "Public half is the .pub file, safe to copy anywhere."),
-        ("h2", "Install the public key"),
-        ("code", "ssh-copy-id user@host"),
-        ("p", "Without ssh-copy-id, append the .pub contents to ~/.ssh/authorized_keys on the "
-              "server by hand."),
-        ("h2", "Permissions"),
-        ("p", "sshd refuses a key whose file is readable by anyone else."),
-        ("code", "chmod 700 ~/.ssh\nchmod 600 ~/.ssh/authorized_keys"),
-        ("h2", "Harden the server"),
-        ("bullet", "PasswordAuthentication no"),
-        ("bullet", "PermitRootLogin no"),
-        ("bullet", "Reload with systemctl reload sshd - keep the current session open until a "
-                   "second one logs in."),
-    ],
-    "6eF2mFuZb7AeOg4IcKtTh9NlWr5YvJxDt": [
-        ("h1", "Firewall"),
-        ("p", "firewalld notes for RHEL based boxes. Every rule belongs to a zone, and the "
-              "active zone is the one bound to the interface."),
-        ("h2", "Check first"),
-        ("code", "firewall-cmd --state\nfirewall-cmd --get-active-zones\nfirewall-cmd --list-all"),
-        ("h2", "Open a port"),
-        ("code", "firewall-cmd --add-port=22/tcp --permanent\nfirewall-cmd --reload"),
-        ("bullet", "Without --permanent the rule is gone after a reload."),
-        ("bullet", "--reload is what applies a permanent rule to the running config."),
-        ("h2", "Services instead of ports"),
-        ("code", "firewall-cmd --add-service=https --permanent"),
-        ("p", "Named services are easier to read later than a bare port number."),
-        ("h2", "Careful on a public interface"),
-        ("bullet", "Confirm the zone before opening anything - the public zone faces the "
-                   "internet."),
-        ("bullet", "--remove-port takes a rule back out with the same syntax."),
-    ],
-    "8iJ4oHwBd9CgQi6KeMvVj1PnYt7AxLzFv": [
-        ("h1", "Linux Path Cheatsheet"),
-        ("p", "Filesystem hierarchy, one line per top level directory."),
-        ("bullet", "/etc - configuration files for the system and installed packages."),
-        ("bullet", "/var - variable state: logs, spools, caches, databases."),
-        ("bullet", "/opt - optional add-on packages that ship their own tree."),
-        ("bullet", "/usr - read-only user programs and their shared data."),
-        ("bullet", "/home - one directory per user account."),
-        ("bullet", "/tmp - scratch space, cleared on boot."),
-        ("bullet", "/proc - kernel and process information, not real files."),
-        ("bullet", "/dev - device nodes."),
-        ("bullet", "/srv - data served by the machine, such as a web root."),
-        ("bullet", "/mnt - manual mount points."),
-    ],
-    "0mN6qJyDf1EiSk8MgOxXl3RpAv9CzNbHx": [
-        ("h1", "8 Popular Network Protocols"),
-        ("p", "What each protocol is for and which OSI layer it sits on."),
-        ("bullet", "HTTP - web pages and APIs, application layer, port 80."),
-        ("bullet", "HTTPS - HTTP wrapped in TLS, port 443."),
-        ("bullet", "FTP - file transfer, separate control and data connections, ports 21 and 20."),
-        ("bullet", "SMTP - sending mail between servers, port 25."),
-        ("bullet", "SSH - encrypted remote shell and tunnels, port 22."),
-        ("bullet", "DNS - name to address lookups, mostly UDP, port 53."),
-        ("bullet", "DHCP - hands out addresses on a LAN, ports 67 and 68."),
-        ("bullet", "TCP - reliable ordered delivery, transport layer, underneath most of the "
-                   "above."),
-    ],
-}
+
+def parse_blocks(text):
+    """Split converted text into the (kind, text) blocks `FileBody` draws.
+
+    Deliberately small: the converted files are the markdown the downloader
+    wrote or the plain text the image converter wrote, and this recognises
+    only what the reading pane can render. Anything it does not know becomes a
+    paragraph, so nothing is ever dropped.
+    """
+    blocks = []
+    paragraph = []
+    code = None
+
+    def close_paragraph():
+        if paragraph:
+            blocks.append(("p", " ".join(paragraph)))
+            paragraph.clear()
+
+    for line in text.splitlines():
+        stripped = line.strip()
+
+        if stripped.startswith("```"):
+            if code is None:
+                close_paragraph()
+                code = []
+            else:
+                blocks.append(("code", "\n".join(code)))
+                code = None
+            continue
+
+        if code is not None:
+            code.append(line)
+            continue
+
+        if not stripped:
+            close_paragraph()
+            continue
+
+        if stripped.startswith("#"):
+            close_paragraph()
+            level = len(stripped) - len(stripped.lstrip("#"))
+            blocks.append(("h1" if level == 1 else "h2", stripped.lstrip("#").strip()))
+            continue
+
+        if stripped[:2] in BULLET_MARKERS:
+            close_paragraph()
+            blocks.append(("bullet", stripped[2:].strip()))
+            continue
+
+        paragraph.append(stripped)
+
+    close_paragraph()
+    # An unterminated fence still has to show, or the tail of the file vanishes.
+    if code:
+        blocks.append(("code", "\n".join(code)))
+    return blocks
 
 
 class SearchView(BaseView):
@@ -183,6 +107,12 @@ class SearchView(BaseView):
         super().__init__()
         self.query = ""
         self.selected_index = 0
+        #: idle | searching | done | failed
+        self.status = "idle"
+        #: The hits of the last finished search.
+        self.hits = []
+        #: Why the last search failed, when it did.
+        self.error = None
 
         # The reading pane runs to the window edges - no padding frame.
         self.reader_container = ft.Container(expand=True)
@@ -199,27 +129,60 @@ class SearchView(BaseView):
 
     @property
     def is_searched(self):
-        return bool(self.query.strip())
+        return self.status != "idle"
+
+    @property
+    def is_searching(self):
+        return self.status == "searching"
 
     def results(self):
-        """Hits ordered by similarity - smallest cosine distance first."""
-        if not self.is_searched:
-            return []
-        return sorted(SEARCH_RESULTS, key=lambda result: result["distance"])
+        """The hits, closest first - the order chroma already returns them in."""
+        return self.hits
 
     def result(self):
-        """The hit the reading pane is showing."""
-        results = self.results()
-        return results[min(self.selected_index, len(results) - 1)]
+        """The hit the reading pane is showing, or None when there are none."""
+        if not self.hits:
+            return None
+        return self.hits[min(self.selected_index, len(self.hits) - 1)]
 
     def search(self, query):
+        """Runs on a worker thread: the first search of a process loads the
+        embedding model, which would freeze the window for seconds."""
+        query = (query or "").strip()
+        if not query:
+            self.clear()
+            return
+
         self.query = query
         self.selected_index = 0
+        self.status = "searching"
+        self.hits = []
+        self.error = None
+        self.refresh()
+
+        if not is_mounted(self.reader_container):
+            # Nothing is driving a UI to keep responsive, so run it here. This
+            # is the path a test takes; the app always has a page.
+            self.run_search()
+            return
+        self.reader_container.page.run_thread(self.run_search)
+
+    def run_search(self):
+        try:
+            self.hits = searchService.search(self.query)
+            self.status = "done"
+        except Exception as error:
+            self.hits = []
+            self.error = str(error)
+            self.status = "failed"
         self.refresh()
 
     def clear(self):
         self.query = ""
         self.selected_index = 0
+        self.status = "idle"
+        self.hits = []
+        self.error = None
         self.refresh()
 
     def select(self, index):
@@ -230,12 +193,20 @@ class SearchView(BaseView):
         """Both panes move together - picking a hit changes each of them."""
         self.search_sidebar.refresh()
         self._fill_reader()
-        self.reader_container.update()
+        send_update(self.reader_container)
 
     def _fill_reader(self):
-        self.reader_container.content = (
-            SearchFilePreviewContainer(self.result()) if self.is_searched else SearchIntroductionContainer()
-        )
+        result = self.result()
+        if result is not None:
+            self.reader_container.content = SearchFilePreviewContainer(result)
+        elif self.status == "searching":
+            self.reader_container.content = SearchingContainer(self.query)
+        elif self.status == "failed":
+            self.reader_container.content = SearchFailedContainer(self.error)
+        elif self.status == "done":
+            self.reader_container.content = NoResultsContainer(self.query)
+        else:
+            self.reader_container.content = SearchIntroductionContainer()
 
 
 class SearchIntroductionContainer(ft.Container):
@@ -273,6 +244,78 @@ class SearchIntroductionContainer(ft.Container):
         self.expand = True
 
 
+class CentredMessageContainer(ft.Container):
+    """A reading pane with one message in the middle of it.
+
+    The three states that are not a file all look like this - only the badge
+    and the words change.
+    """
+
+    def __init__(self, badge, heading, message):
+        super().__init__()
+        self.badge = badge
+        self.heading = heading
+        self.message = message
+
+    def build(self):
+        p = palette()
+        self.content = ft.Column(
+            [
+                self.badge,
+                ft.Container(height=Space.XL),
+                ft.Text(self.heading, size=20, weight=ft.FontWeight.W_700, color=p.text),
+                ft.Text(self.message, size=13, color=p.text_muted,
+                        text_align=ft.TextAlign.CENTER),
+            ],
+            spacing=0,
+            tight=True,
+            alignment=ft.MainAxisAlignment.CENTER,
+            horizontal_alignment=ft.CrossAxisAlignment.CENTER,
+        )
+        self.alignment = ft.Alignment.CENTER
+        self.expand = True
+        self.padding = Space.XXL
+
+
+class SearchingContainer(CentredMessageContainer):
+    """Shown while the worker thread is searching.
+
+    The first search of a process loads the embedding model, which is why the
+    wait is worth a message rather than being over before it is drawn.
+    """
+
+    def __init__(self, query):
+        super().__init__(
+            ft.ProgressRing(width=34, height=34, stroke_width=3),
+            "Searching ...",
+            f"Looking for the closest documents to “{query}”. The first search "
+            "loads the embedding model, so it takes a moment.",
+        )
+
+
+class NoResultsContainer(CentredMessageContainer):
+    """A search that ran and found nothing."""
+
+    def __init__(self, query):
+        super().__init__(
+            IconBadge(ft.Icons.SEARCH_OFF_ROUNDED, "neutral", size=72, icon_size=34),
+            "Nothing close enough",
+            f"No document came back for “{query}”. If the library is empty, run a "
+            "reset from the admin portal first.",
+        )
+
+
+class SearchFailedContainer(CentredMessageContainer):
+    """The search raised - a missing store, or a model that will not load."""
+
+    def __init__(self, error):
+        super().__init__(
+            IconBadge(ft.Icons.ERROR_ROUNDED, "danger", size=72, icon_size=34),
+            "Search failed",
+            error or "Something went wrong.",
+        )
+
+
 class SearchFilePreviewContainer(ft.Column):
     """The file bar tops the pane; the converted text fills what is left.
 
@@ -300,27 +343,26 @@ class FileHeader(Card):
 
     def __init__(self, result):
         p = palette()
-        folder, _, name = result["label"].rpartition("\\")
 
         super().__init__(
             ft.Row(
                 [
-                    FileIcon(result["kind"], size=30),
-                    ft.Text(name, size=14, weight=ft.FontWeight.W_700, color=p.text,
+                    FileIcon(result.kind, size=30),
+                    ft.Text(result.name, size=14, weight=ft.FontWeight.W_700, color=p.text,
                             max_lines=1, overflow=ft.TextOverflow.ELLIPSIS),
                     # The folder soaks up the slack, so the actions stay put and
                     # a deep path is the first thing to be cut.
-                    ft.Text(folder or "(root)", size=11, color=p.text_muted, expand=True,
+                    ft.Text(result.folder or "(root)", size=11, color=p.text_muted, expand=True,
                             max_lines=1, overflow=ft.TextOverflow.ELLIPSIS),
                     ft.Container(width=1, height=22, bgcolor=p.border_soft),
                     ft.Container(
-                        content=Mono(result["id"], size=10, color=p.text, max_lines=1,
+                        content=Mono(result.document_id, size=10, color=p.text, max_lines=1,
                                      overflow=ft.TextOverflow.ELLIPSIS,
-                                     tooltip=f"Drive id {result['id']}"),
+                                     tooltip=result.document_id),
                         width=104,
                     ),
-                    ft.Text(result["modified"], size=10, color=p.text_faint,
-                            tooltip=f"{result['kind']} - modified {result['modified']}"),
+                    ft.Text(result.modified, size=10, color=p.text_faint,
+                            tooltip=f"{result.kind} - modified {result.modified}"),
                     IconButton(ft.Icons.LINK_ROUNDED, "Copy Drive link"),
                     PrimaryButton("Open in Google Drive", icon=ft.Icons.OPEN_IN_NEW_ROUNDED,
                                   is_dense=True),
@@ -339,10 +381,10 @@ class FileBody(Card):
     """The converted text - what was embedded, and what is read here."""
 
     def __init__(self, result):
-        is_image = result["kind"] == "image"
-        blocks = FILE_CONTENT.get(result["id"], [])
+        is_image = result.kind == "image"
+        blocks = parse_blocks(result.text)
 
-        body = [BestMatchingPassage(result["snippet"])] if result.get("snippet") else []
+        body = [OpeningLines(result.preview)] if result.preview else []
         # A converted file opens with its own title, which the header above
         # already shows, so that first heading is dropped.
         body += [
@@ -432,8 +474,12 @@ class FileBody(Card):
         )
 
 
-class BestMatchingPassage(ft.Container):
-    """The chunk that scored - shown before the file itself for context."""
+class OpeningLines(ft.Container):
+    """How the document starts, before the document itself.
+
+    Not "the passage that matched": one vector is embedded per whole file, so
+    no passage is what scored. See `SearchResult.preview`.
+    """
 
     def __init__(self, snippet):
         super().__init__()
@@ -446,7 +492,7 @@ class BestMatchingPassage(ft.Container):
                 ft.Icon(ft.Icons.FORMAT_QUOTE_ROUNDED, size=16, color=p.primary),
                 ft.Column(
                     [
-                        Label("Best matching passage"),
+                        Label("Opening lines"),
                         ft.Text(self.snippet, size=12, color=p.text),
                     ],
                     spacing=3,

@@ -8,33 +8,52 @@ from view.widgets.containers.pill import Pill
 # capped to match.
 STEP_CARD_HEIGHT = 132
 
+#: status -> (icon, pill text, tone). `running` carries no icon: it gets a
+#: spinner instead, which is a control rather than an icon name.
+STEP_STATUSES = {
+    "pending": (ft.Icons.RADIO_BUTTON_UNCHECKED_ROUNDED, "pending", "neutral"),
+    "running": (None, "running", "primary"),
+    "done": (ft.Icons.CHECK_CIRCLE_ROUNDED, "done", "success"),
+    "failed": (ft.Icons.ERROR_ROUNDED, "failed", "danger"),
+    "skipped": (ft.Icons.REMOVE_CIRCLE_OUTLINE_ROUNDED, "skipped", "neutral"),
+}
+
 
 class StepCard(ft.Container):
     """One step, as a column in the horizontal pipeline list.
 
-    Presentation only - every card is drawn pending. Wiring a run means
-    passing the live status in and picking the icon and tone from it.
+    `status` is what a run moves: `pending` before it, `running` on it, then
+    `done`, `failed`, or `skipped` for the steps a stopped run never reached.
     """
 
-    def __init__(self, index, name, description, span):
+    def __init__(self, index, name, description, span, status="pending"):
         super().__init__()
         self.index = index
         self.name = name
         self.description = description
         self.col = span
+        self.status = status
 
     def build(self):
         p = palette()
-        fg, _ = tone("neutral")
+        icon, pill_text, tone_name = STEP_STATUSES.get(self.status, STEP_STATUSES["pending"])
+        fg, _ = tone(tone_name)
+
+        # The step being worked on gets a spinner where the rest get an icon.
+        leading = (
+            ft.ProgressRing(width=16, height=16, stroke_width=2, color=fg)
+            if icon is None
+            else ft.Icon(icon, size=18, color=fg)
+        )
 
         self.content = ft.Column(
             [
                 ft.Row(
                     [
-                        ft.Icon(ft.Icons.RADIO_BUTTON_UNCHECKED_ROUNDED, size=18, color=fg),
+                        leading,
                         ft.Text(f"Step {self.index + 1}", size=11,
                                 weight=ft.FontWeight.W_700, color=fg, expand=True),
-                        Pill("pending", "neutral"),
+                        Pill(pill_text, tone_name),
                     ],
                     spacing=Space.SM,
                     vertical_alignment=ft.CrossAxisAlignment.CENTER,

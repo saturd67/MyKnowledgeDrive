@@ -8,7 +8,7 @@ from typing import TYPE_CHECKING
 
 import flet as ft
 
-from view.admin.screens.library_sync_view import LibrarySyncView
+from view.admin.screens.library_sync.library_sync_view import LibrarySyncView
 from view.admin.screens.library_view import LibraryView
 from view.admin.screens.settings_view import SettingsView
 from view.theme import Radius, Space, palette

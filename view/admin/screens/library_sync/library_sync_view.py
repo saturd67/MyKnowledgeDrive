@@ -3,14 +3,27 @@
 The screen and its blocks live together - each is one part of this one
 screen, never used anywhere else.
 
-Presentation only - nothing runs. Every step is drawn pending, the run log is
-empty, and the reset dialog confirms into a no-op.
+Reset is wired: confirming dispatches `LibraryResetService.start_reset` onto a
+worker thread, and the screen renders the run from `AdminPortal.reset_runner`.
+The runner is on the portal rather than here because a screen is rebuilt on
+every navigation and a reset takes minutes - see
+view/admin/screens/library_sync/library_reset_runner.py.
+
+Sync is still presentation only: every step is drawn pending and Scan does
+nothing. It needs a `file` table and a planner service that do not exist yet.
 """
+
+from pathlib import Path
 
 import flet as ft
 
+from constant.settings import EMBEDDING_MODEL, PATHS_INPUT_DIR, PATHS_OUTPUT_DIR
+from services.SettingService import settingService
+from services.library_reset_service.library_reset_service import LibraryResetService
+from view.admin.screens.library_sync.library_reset_runner import STEP_COUNT, LibraryResetRunner
 from view.base_view import BaseView
-from view.theme import Field, Radius, Space, palette
+from view.theme import Field, Radius, Space, palette, tone
+from view.ui_thread import send_update
 from view.widgets.blocks.page_header import PageHeader
 from view.widgets.blocks.row_label import RowLabel
 from view.widgets.blocks.step_card import StepCard
@@ -23,6 +36,7 @@ from view.widgets.containers.pill import Pill
 from view.widgets.containers.pointer_area import PointerArea
 from view.widgets.containers.section import SectionCard
 from view.widgets.feedback.empty_state import EmptyState
+from view.widgets.feedback.notice_bar import NoticeBar
 from view.widgets.text.mono import Mono
 
 CONFIRM_WORD = "RESET"
@@ -40,51 +54,149 @@ SCAN_STAGES = [
      "Splits the listing into added, updated, removed and unchanged."),
 ]
 
-RESET_STAGES = [
-    ("Download from Drive",
-     "Every supported file in the Drive folder is re-downloaded to resources\\files."),
-    ("Clear converted files", "resources\\converted_files is deleted and recreated."),
-    ("Convert every source file", "Each .docx and image is OCR'd again from scratch."),
-    ("Drop the collection", "The Chroma collection is deleted and recreated."),
-    ("Re-embed everything", "All converted text is embedded back into the store."),
+#: What each of the five reset steps does. The steps are *named* by
+#: `LibraryResetService.STEPS` and only explained here - a second copy of the
+#: names would drift from the ones `on_step` hands back.
+RESET_DESCRIPTIONS = [
+    "Every supported file in the Drive folder is re-downloaded to {input_dir}.",
+    "{output_dir} is deleted and recreated.",
+    "Each .docx and image is OCR'd again from scratch.",
+    "The Chroma collection is deleted and recreated.",
+    "All converted text is embedded back into the store.",
 ]
 
-#: Stand-ins for what the dialog would read off the services.
-SOURCE_FILE_COUNT = 348
-EMBEDDING_MODEL = "all-MiniLM-L6-v2"
+#: label, the result keys summed into it, tone.
+RESULT_TILES = [
+    ("Downloaded", ("downloaded",), "primary"),
+    ("Converted", ("converted",), "primary"),
+    ("Images read", ("converted_images",), "primary"),
+    ("Embedded", ("embedded",), "success"),
+    ("Skipped", ("download_skipped", "embed_skipped"), "neutral"),
+    ("Failed", ("download_failed", "convert_failed", "embed_failed"), "danger"),
+]
+
+#: The pill icon for each run state, keyed by the tone the runner reports.
+RUN_ICONS = {
+    "neutral": ft.Icons.PAUSE_CIRCLE_OUTLINE_ROUNDED,
+    "primary": ft.Icons.SYNC_ROUNDED,
+    "success": ft.Icons.CHECK_CIRCLE_ROUNDED,
+    "warning": ft.Icons.WARNING_AMBER_ROUNDED,
+    "danger": ft.Icons.ERROR_ROUNDED,
+}
+
+
+def reset_stages():
+    """The five steps, named by the service and described here.
+
+    The two paths are read from the setting table rather than written into the
+    text: telling someone a reset will clear a folder it is not going to touch
+    is worse than saying nothing.
+    """
+    values = {
+        "input_dir": settingService.find_active_by_key(PATHS_INPUT_DIR),
+        "output_dir": settingService.find_active_by_key(PATHS_OUTPUT_DIR),
+    }
+    return [
+        (name, description.format(**values))
+        for name, description in zip(LibraryResetService.STEPS, RESET_DESCRIPTIONS)
+    ]
 
 
 class LibrarySyncView(BaseView):
 
-    def __init__(self):
-        super().__init__()
+    def __init__(self, portal=None):
+        super().__init__(portal)
         self.mode = "sync"
-        # Held so select_mode() can redraw the screen in place - the heading,
-        # the accent colour and the step list all change with the mode.
+        # Held so a redraw can swap the screen in place - the heading, the
+        # accent colour, the step list and the log all change with a run.
         self.body_container = ft.Container()
+        # The run outlives this screen, so it is kept on the portal. Standing
+        # one up here keeps the screen buildable on its own, in a test.
+        self.runner = portal.reset_runner if portal is not None else LibraryResetRunner()
+        self.run_log_section = None
 
     def build(self):
+        # The run redraws through whichever screen is showing. The log has its
+        # own hook, so a line does not rebuild the screen hundreds of times.
+        self.runner.on_change = self.refresh
+        self.runner.on_log = self.refresh_log
         self.body_container.content = self._layout()
         return self.body_container
 
+    def refresh(self):
+        self.body_container.content = self._layout()
+        send_update(self.body_container)
+
+    def refresh_log(self):
+        if self.run_log_section is not None:
+            self.run_log_section.refresh_log()
+
     def select_mode(self, mode):
         self.mode = mode
-        self.body_container.content = self._layout()
-        self.body_container.update()
+        self.refresh()
+
+    # --- the run -------------------------------------------------------------
+
+    def start_reset(self, e):
+        """Dispatches onto a worker thread; nothing here waits for it."""
+        page = e.control.page
+        page.pop_dialog()
+        if self.runner.is_running:
+            return
+        self.runner.begin()
+        page.run_thread(self.runner.run)
+
+    def cancel_reset(self, _):
+        self.runner.request_cancel()
+
+    def dismiss_error(self, _=None):
+        self.runner.error = None
+        self.refresh()
+
+    # --- layout --------------------------------------------------------------
 
     def _layout(self):
-        return ft.Column(
-            [
-                SyncHeader(self.mode, self.select_mode, self._open_dialog),
-                ft.Container(height=Space.XL),
-                ResetStepsSection() if self.mode == "reset" else ScanStepsSection(),
-                ft.Container(height=Space.LG),
-                RunLogSection(),
-            ],
-            spacing=0,
-        )
+        blocks = [
+            SyncHeader(self.mode, self.runner, self.select_mode,
+                       self._open_dialog, self.cancel_reset),
+            ft.Container(height=Space.XL),
+        ]
+
+        if self.mode == "reset":
+            if self.runner.error is not None:
+                blocks += [
+                    NoticeBar(f"Reset failed: {self.runner.error}", "danger",
+                              on_hide=self.dismiss_error),
+                    ft.Container(height=Space.LG),
+                ]
+            blocks.append(ResetStepsSection(self.runner))
+            if self.runner.results:
+                blocks += [ft.Container(height=Space.LG), ResultsSection(self.runner.results)]
+        else:
+            blocks.append(ScanStepsSection())
+
+        self.run_log_section = RunLogSection(self.runner)
+        blocks += [ft.Container(height=Space.LG), self.run_log_section]
+
+        return ft.Column(blocks, spacing=0)
 
     # --- reset confirmation --------------------------------------------------
+
+    @staticmethod
+    def source_file_count():
+        """Files under the input folder, walked when the dialog opens.
+
+        "unknown" rather than an error if the folder is not there: the dialog
+        is not where a bad path should be discovered, and the run reports one
+        properly.
+        """
+        try:
+            input_dir = Path(settingService.get_path(PATHS_INPUT_DIR))
+            if not input_dir.is_dir():
+                return "unknown"
+            return str(sum(1 for path in input_dir.rglob("*") if path.is_file()))
+        except OSError:
+            return "unknown"
 
     def _open_dialog(self, e):
         """Everything destructive about a reset, in one place.
@@ -98,7 +210,7 @@ class LibrarySyncView(BaseView):
         page = e.control.page
 
         confirm_button = PrimaryButton("Yes, reset", tone_name="danger",
-                                       on_click=lambda _: page.pop_dialog())
+                                       on_click=self.start_reset)
         confirm_button.disabled = True
 
         def on_change(e):
@@ -139,18 +251,8 @@ class LibrarySyncView(BaseView):
                                 [
                                     RowLabel("Files to convert"),
                                     ft.Container(
-                                        content=ft.Text(str(SOURCE_FILE_COUNT), size=13,
+                                        content=ft.Text(self.source_file_count(), size=13,
                                                         color=p.text),
-                                        expand=True,
-                                    ),
-                                ],
-                                vertical_alignment=ft.CrossAxisAlignment.CENTER,
-                            ),
-                            ft.Row(
-                                [
-                                    RowLabel("Estimated duration"),
-                                    ft.Container(
-                                        content=ft.Text("~5 min", size=13, color=p.text),
                                         expand=True,
                                     ),
                                 ],
@@ -160,7 +262,9 @@ class LibrarySyncView(BaseView):
                                 [
                                     RowLabel("Embedding model"),
                                     ft.Container(
-                                        content=Mono(EMBEDDING_MODEL, size=12, color=p.text),
+                                        content=Mono(
+                                            settingService.find_active_by_key(EMBEDDING_MODEL),
+                                            size=12, color=p.text),
                                         expand=True,
                                     ),
                                 ],
@@ -170,7 +274,9 @@ class LibrarySyncView(BaseView):
                                 [
                                     RowLabel("Last reset"),
                                     ft.Container(
-                                        content=ft.Text("6 days ago", size=13, color=p.text),
+                                        # Nothing records a finished run yet -
+                                        # that is plans/sync-run-table.md.
+                                        content=ft.Text("never", size=13, color=p.text_muted),
                                         expand=True,
                                     ),
                                 ],
@@ -214,11 +320,13 @@ class LibrarySyncView(BaseView):
 class SyncHeader(ft.Column):
     """Heading, description, the run button and the mode switch."""
 
-    def __init__(self, mode, on_select_mode, on_reset):
+    def __init__(self, mode, runner, on_select_mode, on_reset, on_cancel):
         super().__init__()
         self.mode = mode
+        self.runner = runner
         self.on_select_mode = on_select_mode
         self.on_reset = on_reset
+        self.on_cancel = on_cancel
 
     def build(self):
         p = palette()
@@ -228,6 +336,20 @@ class SyncHeader(ft.Column):
             description = "Full rebuild - use it for a first run or when the store is out of sync."
             action = PrimaryButton("Reset library", icon=ft.Icons.DELETE_FOREVER_ROUNDED,
                                    tone_name="danger", on_click=self.on_reset)
+
+            if self.runner.is_running:
+                if self.runner.cancel_requested:
+                    # Cancel is only checked between steps, so the one already
+                    # running has to finish. Saying so beats a button that
+                    # looks broken for the next two minutes.
+                    description = "Cancelling - the step already running has to finish first."
+                    action = GhostButton("Cancelling...", icon=ft.Icons.HOURGLASS_TOP_ROUNDED)
+                    action.disabled = True
+                else:
+                    description = (f"Step {self.runner.step_number or 1} of {STEP_COUNT} - "
+                                   "leaving this screen will not stop it.")
+                    action = GhostButton("Cancel", icon=ft.Icons.STOP_CIRCLE_OUTLINED,
+                                         on_click=self.on_cancel)
         else:
             heading = "Sync library"
             description = "Scan for what changed, then update only the files you pick."
@@ -309,24 +431,26 @@ class ScanStepsSection(SectionCard):
 
 
 class ResetStepsSection(SectionCard):
-    """What a full rebuild does, in order."""
+    """What a full rebuild does, in order, and where the run has got to."""
 
-    def __init__(self):
+    def __init__(self, runner):
+        stages = reset_stages()
         # A 12-column grid split between the steps, with breakpoints so they
         # wrap rather than run off the side. A plain Row with expanded children
         # sizes each card to its own text, which overflows on a narrow window
         # and simply clips the last step.
-        span = {"xs": 12, "md": 6, "xl": 12 / len(RESET_STAGES)}
+        span = {"xs": 12, "md": 6, "xl": 12 / len(stages)}
+        pill_text, pill_tone = runner.summary()
         super().__init__(
             "Pipeline steps",
             "What a full rebuild does, in order.",
-            trailing=Pill("Idle", "neutral", ft.Icons.PAUSE_CIRCLE_OUTLINE_ROUNDED),
+            trailing=Pill(pill_text, pill_tone, RUN_ICONS[pill_tone]),
             # Equal columns rather than a stack: the steps run left to right,
             # so the pipeline is one line to read across.
             content=ft.ResponsiveRow(
                 [
-                    StepCard(index, name, description, span)
-                    for index, (name, description) in enumerate(RESET_STAGES)
+                    StepCard(index, name, description, span, runner.step_status(index))
+                    for index, (name, description) in enumerate(stages)
                 ],
                 spacing=Space.MD,
                 run_spacing=Space.MD,
@@ -335,18 +459,95 @@ class ResetStepsSection(SectionCard):
         )
 
 
-class RunLogSection(SectionCard):
-    """Where the services' output streams while a run is in progress."""
+class ResultsSection(SectionCard):
+    """What the run that just finished actually did."""
 
-    def __init__(self):
+    def __init__(self, results):
+        span = {"xs": 6, "md": 4, "xl": 2}
         super().__init__(
-            "Run log",
-            "Mirrors what the services log while a run is in progress.",
-            trailing=IconButton(ft.Icons.CONTENT_COPY_ROUNDED, "Copy the run log"),
-            content=EmptyState(
+            "Last run",
+            "Counts reported by the three services this run drove.",
+            content=ft.ResponsiveRow(
+                [
+                    ResultTile(label, sum(results.get(key, 0) for key in keys), tone_name, span)
+                    for label, keys, tone_name in RESULT_TILES
+                ],
+                spacing=Space.MD,
+                run_spacing=Space.MD,
+            ),
+        )
+
+
+class ResultTile(ft.Container):
+    """One count from the run, as a tile."""
+
+    def __init__(self, label, count, tone_name, span):
+        super().__init__()
+        self.label = label
+        self.count = count
+        self.tone_name = tone_name
+        self.col = span
+
+    def build(self):
+        p = palette()
+        # A zero stays neutral whatever the tile is for - nothing failed is not
+        # a failure, and a red 0 reads like one at a glance.
+        fg, _ = tone(self.tone_name if self.count else "neutral")
+
+        self.content = ft.Column(
+            [
+                ft.Text(str(self.count), size=20, weight=ft.FontWeight.W_700, color=fg),
+                ft.Text(self.label, size=11, color=p.text_muted),
+            ],
+            spacing=2,
+        )
+        self.padding = Space.MD
+        self.bgcolor = p.surface_alt
+        self.border = ft.Border.all(1, p.border_soft)
+        self.border_radius = Radius.MD
+
+
+class RunLogSection(SectionCard):
+    """Where the services' output streams while a run is in progress.
+
+    The lines come from a logging handler the runner attaches for the length
+    of a run, so nothing in services/ had to grow a callback to feed this.
+    """
+
+    def __init__(self, runner):
+        log_list = ft.ListView(
+            RunLogSection.log_lines(runner),
+            auto_scroll=True,
+            spacing=2,
+            height=280,
+            padding=Space.MD,
+        )
+        # The empty state only while nothing has been run: once a run starts,
+        # the list is on screen and ready for `refresh_log` to append into.
+        body = log_list
+        if runner.is_idle and not runner.lines:
+            body = EmptyState(
                 ft.Icons.TERMINAL_ROUNDED,
                 "Log is empty",
                 "Output from the converter and the embedder will stream here.",
                 height=280,
-            ),
+            )
+
+        super().__init__(
+            "Run log",
+            "Mirrors what the services log while a run is in progress.",
+            trailing=IconButton(ft.Icons.CONTENT_COPY_ROUNDED, "Copy the run log"),
+            content=body,
         )
+        self.runner = runner
+        self.log_list = log_list
+
+    @staticmethod
+    def log_lines(runner):
+        p = palette()
+        return [Mono(line, size=11, color=p.text_muted) for line in runner.lines]
+
+    def refresh_log(self):
+        """Only the log moves, so the rest of the screen is left alone."""
+        self.log_list.controls = RunLogSection.log_lines(self.runner)
+        send_update(self.log_list)

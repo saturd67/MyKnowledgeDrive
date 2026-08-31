@@ -8,6 +8,7 @@ reads both - picking a nav row redraws each column.
 import flet as ft
 
 from view.admin.admin_sidebar import NAV_ITEMS, AdminSidebar
+from view.admin.screens.library_sync.library_reset_runner import LibraryResetRunner
 from view.theme import Space, palette
 
 
@@ -16,6 +17,9 @@ class AdminPortal(ft.Row):
     def __init__(self):
         super().__init__()
         self.index = 0
+        # Held here, not on the Library Sync screen: a reset takes minutes and
+        # the screen is rebuilt the moment you navigate anywhere else.
+        self.reset_runner = LibraryResetRunner()
 
         # Held so refresh() can swap just the screen, leaving the chrome alone.
         self.body_container = ft.Container(expand=True)
@@ -54,6 +58,10 @@ class AdminPortal(ft.Row):
 
     def _fill_reader(self):
         """A screen is built fresh each time - the instance lives for one build."""
+        # Before the new screen attaches its own: a run in progress keeps
+        # going with nowhere to draw, rather than drawing into the old tree.
+        self.reset_runner.detach()
+
         view_class = NAV_ITEMS[self.index][3]
         self.scroll_column.scroll = ft.ScrollMode.AUTO if view_class.scrolls else None
-        self.body_container.content = view_class().build()
+        self.body_container.content = view_class(self).build()

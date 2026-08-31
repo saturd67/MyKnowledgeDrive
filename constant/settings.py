@@ -32,7 +32,7 @@ SETTING_DEFAULT_VALUES = (
     (PATHS_INPUT_DIR, "resources\\files"),
     (PATHS_OUTPUT_DIR, "resources\\converted_files"),
     (PATHS_CHROMA_STORE, "resources\\my_chroma_store"),
-    (DRIVE_FOLDER_ID, "1VWtBJ4KClTf7v8ULab7VN-45QK-au0DO"),
+    (DRIVE_FOLDER_ID, "1qdWetXw2gHA4RV22pZAoc-h_cEQBwoUi"),
     (DRIVE_SERVICE_ACCOUNT_FILE, "C:/secrets/my_knowledge_drive_service_account.json"),
     (DRIVE_SCOPE, "https://www.googleapis.com/auth/drive.readonly"),
     (EMBEDDING_MODEL, "all-MiniLM-L6-v2"),

@@ -6,12 +6,16 @@ top-level folders and is browsed by opening them rather than paged through.
 
 The screen and its blocks live together - each is one part of this one screen.
 
-Presentation only - the documents below are placeholders, nothing reads the
-collection, and Refresh, copy and open-in-Drive are not wired up.
+The documents come from the collection itself, through `LibraryService` -
+metadata only, so nothing here loads the embedding model. Copy and
+open-in-Drive are still not wired up.
 """
 
 import flet as ft
 
+from constant.settings import EMBEDDING_COLLECTION
+from services.SettingService import settingService
+from services.library_service.library_service import LibraryService
 from view.base_view import BaseView
 from view.theme import Field, Radius, Space, palette
 from view.widgets.blocks.file_icon import FileIcon
@@ -23,6 +27,7 @@ from view.widgets.containers.pill import Pill
 from view.widgets.containers.pointer_area import PointerArea
 from view.widgets.containers.section import SectionCard
 from view.widgets.feedback.empty_state import EmptyState
+from view.widgets.feedback.notice_bar import NoticeBar
 from view.widgets.text.label import Label
 from view.widgets.text.mono import Mono
 
@@ -34,53 +39,6 @@ ID_WIDTH = 290
 TYPE_WIDTH = 80
 ACTIONS_WIDTH = 88
 
-COLLECTION = "my_knowledge_drive"
-
-#: id, path, kind - stand-ins until this screen reads the collection.
-DOCUMENTS = [
-    ("1aB7xQfKm2LpZr9TnVdEs4YwHc0JgUiOe", "Docker\\Docker Commands Cheat Sheet", "image"),
-    ("2cD8yRgLn3MqAs0UoWfFt5ZxId1KhVjPf", "Docker\\Docker General Notes", "doc"),
-    ("3eF9zShMo4NrBt1VpXgGu6AyJe2LiWkQg", "Docker\\Installation Guides", "doc"),
-    ("4gH0aTiNp5OsCu2WqYhHv7BzKf3MjXlRh", "Flutter\\Build\\Build", "doc"),
-    ("5iJ1bUjOq6PtDv3XrZiIw8CaLg4NkYmSi", "Flutter\\App Icon\\Change Icon", "doc"),
-    ("6kL2cVkPr7QuEw4YsAjJx9DbMh5OlZnTj", "Git\\Git Flow", "image"),
-    ("7mN3dWlQs8RvFx5ZtBkKy0EcNi6PmAoUk", "Git\\Branch Rename", "doc"),
-    ("8oP4eXmRt9SwGy6AuClLz1FdOj7QnBpVl", "Java\\Spring Boot Setup", "doc"),
-    ("9qR5fYnSu0TxHz7BvDmMa2GePk8RoCqWm", "Java\\Spring Annotations", "doc"),
-    ("0sT6gZoTv1UyIa8CwEnNb3HfQl9SpDrXn", "Java\\JPA, IOC, AOP, MVC", "doc"),
-    ("1uV7hApUw2VzJb9DxFoOc4IgRm0TqEsYo", "Java\\Quartz\\Quartz", "doc"),
-    ("2wX8iBqVx3WaKc0EyGpPd5JhSn1UrFtZp",
-     "Java\\JavaMultiTreadingAndAsync\\ThreadExample1", "code"),
-    ("3yZ9jCrWy4XbLd1FzHqQe6KiTo2VsGuAq", "Linux\\Linux General Notes", "doc"),
-    ("4aB0kDsXz5YcMe2GaIrRf7LjUp3WtHvBr", "Linux\\SSH & SFTP\\SSH Tunnel", "doc"),
-    ("5cD1lEtYa6ZdNf3HbJsSg8MkVq4XuIwCs", "Linux\\SSH & SFTP\\SSH with Private Key", "doc"),
-    ("6eF2mFuZb7AeOg4IcKtTh9NlWr5YvJxDt", "Linux\\Firewall", "doc"),
-    ("7gH3nGvAc8BfPh5JdLuUi0OmXs6ZwKyEu", "Linux\\Installations\\Install docker", "doc"),
-    ("8iJ4oHwBd9CgQi6KeMvVj1PnYt7AxLzFv", "Linux\\Linux Path Cheatsheet", "image"),
-    ("9kL5pIxCe0DhRj7LfNwWk2QoZu8ByMaGw", "Networking\\Networking", "doc"),
-    ("0mN6qJyDf1EiSk8MgOxXl3RpAv9CzNbHx", "Networking\\8 Popular Network Protocols", "image"),
-    ("1oP7rKzEg2FjTl9NhPyYm4SqBw0DaOcIy", "Networking\\OSI Layers and Protocols Example", "image"),
-    ("2qR8sLaFh3GkUm0OiQzZn5TrCx1EbPdJz", "Nginx\\Nginx", "doc"),
-    ("3sT9tMbGi4HlVn1PjRaAo6UsDy2FcQeKa", "Nginx\\Load Balancer", "doc"),
-    ("4uV0uNcHj5ImWo2QkSbBp7VtEz3GdRfLb", "Nginx\\Proxy", "doc"),
-    ("5wX1vOdIk6JnXp3RlTcCq8WuFa4HeSgMc", "Node.js\\Node.js", "doc"),
-    ("6yZ2wPeJl7KoYq4SmUdDr9XvGb5IfThNd", "Node.js\\Node\\server", "code"),
-    ("7aB3xQfKm8LpZr5TnVeEs0YwHc6JgUiOe", "Python\\Python Notes\\Async\\Asyncio", "doc"),
-    ("8cD4yRgLn9MqAs6UoWfFt1ZxId7KhVjPf",
-     "Python\\Python Notes\\Threading\\testThreading_1", "code"),
-    ("9eF5zShMo0NrBt7VpXgGu2AyJe8LiWkQg", "Python\\Python Notes\\Pandas\\Pandas", "doc"),
-    ("0gH6aTiNp1OsCu8WqYhHv3BzKf9MjXlRh",
-     "Python\\VectorDB\\VectorDB Libraries Installation", "doc"),
-    ("1iJ7bUjOq2PtDv9XrZiIw4CaLg0NkYmSi", "SQL\\Postgres", "doc"),
-    ("2kL8cVkPr3QuEw0YsAjJx5DbMh1OlZnTj", "SQL\\MSSQL", "doc"),
-    ("3mN9dWlQs4RvFx1ZtBkKy6EcNi2PmAoUk", "Redis\\Commands Cheat Sheet", "doc"),
-    ("4oP0eXmRt5SwGy2AuClLz7FdOj3QnBpVl", "Security\\nmap\\nmap cheat sheet page1", "image"),
-    ("5qR1fYnSu6TxHz3BvDmMa8GePk4RoCqWm", "Security\\Study Paths", "doc"),
-    ("6sT2gZoTv7UyIa4CwEnNb9HfQl5SpDrXn", "VueJs\\Setup", "doc"),
-    ("7uV3hApUw8VzJb5DxFoOc0IgRm6TqEsYo", "VueJs\\Vue Nonce-based CSP", "doc"),
-    ("8wX4iBqVx9WaKc6EyGpPd1JhSn2UrFtZp", "Windows Commands\\Windows Commands", "doc"),
-]
-
 
 class LibraryView(BaseView):
 
@@ -88,12 +46,17 @@ class LibraryView(BaseView):
     # stat cards and the column header stay put while the rows move.
     scrolls = False
 
-    def __init__(self):
-        super().__init__()
+    def __init__(self, portal=None):
+        super().__init__(portal)
         self.filter_text = ""
         self.folders_open = {}
+        #: Every Document in the collection, read once when the screen opens.
+        self.documents = []
+        #: Why the read failed, when it did.
+        self.error = None
         # Held so refresh() can redraw after a filter or a folder toggle.
         self.body_container = ft.Container(expand=True)
+        self.load()
 
     def build(self):
         self.body_container.content = self._layout()
@@ -103,11 +66,28 @@ class LibraryView(BaseView):
         self.body_container.content = self._layout()
         self.body_container.update()
 
+    def load(self):
+        """Read the collection. A failure is shown, not raised - a missing
+        store or an unreadable one should leave the screen usable."""
+        try:
+            self.documents = LibraryService().find_all_documents()
+            self.error = None
+        except Exception as error:
+            self.documents = []
+            self.error = str(error)
+
+    def reload(self, _=None):
+        self.load()
+        self.refresh()
+
     def filtered(self):
         needle = self.filter_text.strip().lower()
         if not needle:
-            return DOCUMENTS
-        return [d for d in DOCUMENTS if needle in d[1].lower() or needle in d[0].lower()]
+            return self.documents
+        return [
+            document for document in self.documents
+            if needle in document.label.lower() or needle in document.document_id.lower()
+        ]
 
     def is_folder_open(self, path):
         """Folders start closed, so the screen opens on the top-level folders
@@ -122,7 +102,7 @@ class LibraryView(BaseView):
         """Nest documents under their folders, keyed by path segment."""
         root = {"folders": {}, "files": []}
         for document in documents:
-            folder, _, _name = document[1].rpartition("\\")
+            folder = document.folder
             node = root
             for segment in folder.split("\\") if folder else []:
                 node = node["folders"].setdefault(segment, {"folders": {}, "files": []})
@@ -139,16 +119,26 @@ class LibraryView(BaseView):
     def _layout(self):
         documents = self.filtered()
         tree = self.build_tree(documents)
+        collection = settingService.find_active_by_key(EMBEDDING_COLLECTION)
+
+        notice = []
+        if self.error is not None:
+            notice = [
+                NoticeBar(f"Could not read the collection: {self.error}", "danger"),
+                ft.Container(height=Space.LG),
+            ]
 
         return ft.Column(
             [
                 PageHeader(
                     "Library",
-                    f"{len(DOCUMENTS)} documents embedded in {COLLECTION}.",
-                    actions=[GhostButton("Refresh", icon=ft.Icons.REFRESH_ROUNDED)],
+                    f"{len(self.documents)} documents embedded in {collection}.",
+                    actions=[GhostButton("Refresh", icon=ft.Icons.REFRESH_ROUNDED,
+                                         on_click=self.reload)],
                 ),
                 ft.Container(height=Space.XL),
-                LibraryStats(len(DOCUMENTS), len(documents),
+                *notice,
+                LibraryStats(len(self.documents), len(documents),
                              len(tree["folders"]), self.folder_count(tree)),
                 ft.Container(height=Space.LG),
                 DocumentsSection(self, tree),
@@ -241,6 +231,14 @@ class DocumentsSection(SectionCard):
         p = palette()
 
         if not tree["folders"] and not tree["files"]:
+            # An empty collection and an over-narrow filter look identical in
+            # the tree, but there is nothing to try differently in the first.
+            if not self.view.documents:
+                return EmptyState(
+                    ft.Icons.INBOX_ROUNDED,
+                    "Nothing is embedded yet",
+                    "Run a reset from Library Sync to fill the collection.",
+                )
             return EmptyState(
                 ft.Icons.SEARCH_OFF_ROUNDED,
                 "No documents match that filter",
@@ -270,14 +268,12 @@ class DocumentsSection(SectionCard):
             expand=True,
         )
 
-    @staticmethod
-    def folder_ids():
+    def folder_ids(self):
         """Every folder path in the library, including the prefixes that chain
         collapsing hides - setting one of those is harmless."""
         ids = set()
-        for document in DOCUMENTS:
-            folder = document[1].rpartition("\\")[0]
-            segments = folder.split("\\") if folder else []
+        for document in self.view.documents:
+            segments = document.folder.split("\\") if document.folder else []
             for index in range(1, len(segments) + 1):
                 ids.add("\\".join(segments[:index]))
         return ids
@@ -311,8 +307,8 @@ class DocumentsSection(SectionCard):
             rows.append(self._folder_row(path, label, self.doc_count(child), depth, is_open))
             if is_open:
                 rows += self._rows(child, depth + 1, path)
-        for doc_id, doc_label, kind in sorted(node["files"], key=lambda d: d[1].lower()):
-            rows.append(self._doc_row(doc_id, doc_label.rpartition("\\")[2], kind, depth))
+        for document in sorted(node["files"], key=lambda d: d.label.lower()):
+            rows.append(self._doc_row(document, depth))
         return rows
 
     @staticmethod
@@ -364,18 +360,20 @@ class DocumentsSection(SectionCard):
         hover_bgcolor=p.surface_alt
     )
 
-    def _doc_row(self, doc_id, name, kind, depth):
+    def _doc_row(self, document, depth):
         p = palette()
+        kind = document.kind
         _icon, kind_tone = FileIcon.KINDS.get(kind, FileIcon.KINDS["text"])
 
         return ft.Container(
             content=ft.Row(
                 [
                     FileIcon(kind, size=26),
-                    ft.Text(name, size=13, weight=ft.FontWeight.W_600, color=p.text,
+                    ft.Text(document.name, size=13, weight=ft.FontWeight.W_600, color=p.text,
                             overflow=ft.TextOverflow.ELLIPSIS, expand=True),
                     ft.Container(
-                        content=Mono(doc_id, size=11, overflow=ft.TextOverflow.ELLIPSIS),
+                        content=Mono(document.document_id, size=11,
+                                     overflow=ft.TextOverflow.ELLIPSIS),
                         width=ID_WIDTH,
                     ),
                     ft.Container(content=Pill(kind, kind_tone), width=TYPE_WIDTH),
