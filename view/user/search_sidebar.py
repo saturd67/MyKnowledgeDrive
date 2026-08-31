@@ -9,7 +9,7 @@ from typing import TYPE_CHECKING
 import flet as ft
 
 from view.theme import Radius, Space, palette, tone
-from view.ui_thread import send_update
+from view.ui_thread import control_update
 from view.widgets.blocks.brand import BrandHeader
 from view.widgets.blocks.file_icon import FileIcon
 from view.widgets.buttons.icon_button import IconButton
@@ -76,7 +76,7 @@ class SearchPanel(ft.Column):
 
     def refresh(self):
         self.controls = self._blocks()
-        send_update(self)
+        control_update(self)
 
     def _blocks(self):
         p = palette()

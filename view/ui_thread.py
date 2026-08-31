@@ -28,7 +28,7 @@ def is_mounted(control):
         return False
 
 
-def send_update(control):
+def control_update(control):
     """Update `control` on the event loop thread, from wherever this is called.
 
     A no-op for a control that is not on the page. That is not an error: the

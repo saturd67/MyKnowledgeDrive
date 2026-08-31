@@ -15,7 +15,7 @@ import flet as ft
 from services.search_service.search_service import searchService
 from view.base_view import BaseView
 from view.theme import Radius, Space, palette
-from view.ui_thread import is_mounted, send_update
+from view.ui_thread import is_mounted, control_update
 from view.user.search_sidebar import SearchSidebar
 from view.widgets.blocks.brand import BrandHeader
 from view.widgets.blocks.file_icon import FileIcon
@@ -193,7 +193,7 @@ class SearchView(BaseView):
         """Both panes move together - picking a hit changes each of them."""
         self.search_sidebar.refresh()
         self._fill_reader()
-        send_update(self.reader_container)
+        control_update(self.reader_container)
 
     def _fill_reader(self):
         result = self.result()

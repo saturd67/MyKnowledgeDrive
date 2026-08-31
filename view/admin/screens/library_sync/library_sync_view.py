@@ -23,7 +23,7 @@ from services.library_reset_service.library_reset_service import LibraryResetSer
 from view.admin.screens.library_sync.library_reset_runner import STEP_COUNT, LibraryResetRunner
 from view.base_view import BaseView
 from view.theme import Field, Radius, Space, palette, tone
-from view.ui_thread import send_update
+from view.ui_thread import control_update
 from view.widgets.blocks.page_header import PageHeader
 from view.widgets.blocks.row_label import RowLabel
 from view.widgets.blocks.step_card import StepCard
@@ -89,7 +89,7 @@ class LibrarySyncView(BaseView):
 
     def refresh(self):
         self.body_container.content = self.build_layout()
-        send_update(self.body_container)
+        control_update(self.body_container)
 
     def refresh_log(self):
         if self.run_log_section is not None:
@@ -617,4 +617,4 @@ class RunLogSection(SectionCard):
     def refresh_log(self):
         """Only the log moves, so the rest of the screen is left alone."""
         self.log_list.controls = RunLogSection.log_lines(self.runner)
-        send_update(self.log_list)
+        control_update(self.log_list)
