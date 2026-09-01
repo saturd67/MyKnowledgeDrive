@@ -156,16 +156,22 @@ class LibrarySyncView(BaseView):
         """Dispatches the scan; nothing here waits for it."""
         if self.sync_runner.is_running:
             return
+        # The page first, and this order is load-bearing: `begin_scan` redraws
+        # the screen, which replaces the very button that was clicked, and
+        # `Control.page` raises once a control is off the page.
+        page = e.control.page
         self.sync_runner.begin_scan()
-        e.control.page.run_thread(self.sync_runner.run_scan)
+        page.run_thread(self.sync_runner.run_scan)
 
     def start_update(self, e):
         """Applies the ticked rows. No confirmation: an update is additive
         except for the removals, and those are only ever ticked deliberately."""
         if self.sync_runner.is_running or not self.sync_runner.selected_changes:
             return
+        # Read before `begin_update` redraws this button away - see start_scan.
+        page = e.control.page
         self.sync_runner.begin_update()
-        e.control.page.run_thread(self.sync_runner.run_update)
+        page.run_thread(self.sync_runner.run_update)
 
     def cancel_sync(self, _):
         self.sync_runner.request_cancel()
