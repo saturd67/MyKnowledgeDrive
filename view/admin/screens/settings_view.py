@@ -115,7 +115,7 @@ class DriveSettings:
 
     def validate(self):
         """A missing credentials file is not checked here - it fails when
-        `FileFetcherService` is built, which keeps this screen usable while
+        `FileDownloaderService` is built, which keeps this screen usable while
         the path is being fixed."""
         if not self.folder_id.strip():
             return "Folder id cannot be empty."
@@ -402,7 +402,7 @@ class DriveSectionCard(SectionCard):
         drive = view.drive
         super().__init__(
             "Google Drive",
-            "Used by services/FileFetcherService.py.",
+            "Used by services/file_downloader_service/.",
             trailing=Pill("Read-only scope", "success", ft.Icons.CLOUD_DONE_ROUNDED),
             content=ft.Column(
                 [
@@ -517,7 +517,7 @@ class EmbeddingSectionCard(SectionCard):
         embedding = view.embedding
         super().__init__(
             "Embedding",
-            "Used by services/TextEmbedderService.py.",
+            "Used by services/file_embedder_service/ and the search.",
             content=ft.Column(
                 [
                     ft.Row(

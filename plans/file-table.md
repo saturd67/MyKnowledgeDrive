@@ -1,6 +1,23 @@
 # `file` table
 
-**Status: designed, not implemented.** The layering will be
+**Status: designed, not implemented — and Sync now works without it.**
+`services/sync_planner_service/sync_planner_service.py` scans by re-deriving
+everything from the three live sources on every run, which is what the section
+below already required of it: a row was never allowed to decide that a file
+needs updating, so nothing in the scan was ever going to read this table.
+
+What the table would still add, and what its absence costs today:
+
+| it would give | today |
+| --- | --- |
+| a first paint before the scan returns | the review list is empty until a scan finishes |
+| per-file history across restarts | nothing is remembered between runs |
+| the Library listing from SQLite | `LibraryService` reads Chroma directly |
+
+So it is now an optimisation and a history feature, not a prerequisite. Build
+it when the first paint or the history is wanted; the planner will not change.
+
+The layering will be
 `view → services/FileService.py → repository/FileRepository.py →
 services/DatabaseService.py`: all SQL for this table lives in the repository,
 `DatabaseService` only hands out connections, and `FileService` owns the

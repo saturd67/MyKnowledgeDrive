@@ -12,35 +12,15 @@ services would have to call: all three workers log through `logging` under
 of the run catches everything without touching them.
 """
 
-import logging
 from collections import deque
 
 from services.library_reset_service.library_reset_service import (
     LibraryResetCancelled,
     LibraryResetService,
 )
-
-#: The logger the three workers sit under. Not the root - that would pull in
-#: chromadb, urllib3 and googleapiclient chatter that says nothing about the run.
-LOGGED_MODULE = "services"
-
-#: Nobody scrolls back further than this, and a run touching every file across
-#: five steps would otherwise grow the list without a bound.
-MAX_LOG_LINES = 500
+from view.admin.screens.library_sync.run_log_handler import MAX_LOG_LINES, RunLogHandler
 
 STEP_COUNT = len(LibraryResetService.STEPS)
-
-
-class RunLogHandler(logging.Handler):
-    """Feeds the runner's log from whatever the services log."""
-
-    def __init__(self, runner):
-        super().__init__(level=logging.INFO)
-        self.runner = runner
-        self.setFormatter(logging.Formatter("%(asctime)s  %(message)s", datefmt="%H:%M:%S"))
-
-    def emit(self, record):
-        self.runner.log(self.format(record))
 
 
 class LibraryResetRunner:
@@ -73,6 +53,12 @@ class LibraryResetRunner:
     @property
     def is_idle(self):
         return self.status == "idle"
+
+    @property
+    def step_count(self):
+        """Fixed, unlike the sync runner's - a reset is always the same six
+        steps. Here so the header can read either runner the same way."""
+        return STEP_COUNT
 
     def step_status(self, index):
         """`pending` / `running` / `done` / `failed` / `skipped` for one card."""
@@ -126,14 +112,8 @@ class LibraryResetRunner:
         Nothing here touches flet: the screen redraws through `on_change`,
         which is the one place the UI is reached from this thread.
         """
-        handler = RunLogHandler(self)
-        logger = logging.getLogger(LOGGED_MODULE)
-        # Without this the records never reach the handler: these loggers are
-        # NOTSET, so their effective level comes from the root, which is
-        # WARNING by default and would drop every INFO line the run produces.
-        previous_level = logger.level
-        logger.addHandler(handler)
-        logger.setLevel(logging.INFO)
+        run_log_handler = RunLogHandler(self)
+        previous_level = run_log_handler.attach()
 
         try:
             results = LibraryResetService().start_reset(
@@ -146,10 +126,7 @@ class LibraryResetRunner:
         except Exception as error:
             self.handle_run_fail(error)
         finally:
-            # A handler left on a module logger outlives the run and would
-            # keep appending to a runner nothing is showing.
-            logger.removeHandler(handler)
-            logger.setLevel(previous_level)
+            run_log_handler.detach(previous_level)
 
     def request_cancel(self):
         """Asks the run to stop. It is checked between steps, so the step

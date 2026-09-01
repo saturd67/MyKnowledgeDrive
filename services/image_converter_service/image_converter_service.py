@@ -24,9 +24,9 @@ class ImageConverterService:
       embedded in markdown - what the Google Doc export and the docx conversion
       leave behind
 
-    The text replaces the image in the markdown, wrapped in the same markers
-    components/FileManager.py uses, so a reader can still tell where a picture
-    was and that its text was read out of one.
+    The text replaces the image in the markdown, wrapped in markers, so a
+    reader can still tell where a picture was and that its text was read out
+    of one.
     """
 
     IMAGE_TEXT_TEMPLATE = "\n\n-----img start-----\n{text}\n-----img end-----\n\n"

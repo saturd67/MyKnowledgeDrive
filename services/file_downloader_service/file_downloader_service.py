@@ -56,6 +56,47 @@ class FileDownloaderService:
         )
         return downloaded_file_count, skipped_file_count, failed_file_count
 
+    def list_files(self):
+        """Walks the tree and reports what is there, downloading nothing.
+
+        Each entry is (file_id, name, mime_type, modified_time, folder_path),
+        where `folder_path` is the folders above it relative to the output
+        folder - the same place `start_download` would have written it, which
+        is what makes the listing comparable to what is already on disk.
+
+        The names are sanitised here, so a caller building a path from one
+        gets the path the downloader would have used, not Drive's raw name."""
+        logger.info(f"Listing folder {self.folder_id}")
+        drive_files = self._list_files_in_folder(self.folder_id, Path())
+        logger.info(f"Found {len(drive_files)} file(s) on Drive")
+        return drive_files
+
+    def download_file(self, file_id, name, mime_type, folder_path):
+        """Downloads one file into `folder_path` under the output folder.
+
+        The single-file counterpart of `start_download`, for an update that
+        was asked for a handful of files rather than the whole tree. Same
+        factory, so a file fetched here lands exactly where a full run would
+        have put it. Returns False when the type is one we skip."""
+        target_dir = self.output_dir / folder_path
+        target_dir.mkdir(parents=True, exist_ok=True)
+        downloadable_file = DownloadableFileFactory.get_file(
+            self.drive_service, file_id, self._sanitize_name(name), mime_type, target_dir
+        )
+        return downloadable_file.download()
+
+    def _list_files_in_folder(self, folder_id, folder_path):
+        drive_files = []
+        for file in self._list_folder_children(folder_id):
+            name = self._sanitize_name(file["name"])
+            if file["mimeType"] == FileDownloaderService.FOLDER_MIME_TYPE:
+                drive_files += self._list_files_in_folder(file["id"], folder_path / name)
+                continue
+            drive_files.append(
+                (file["id"], name, file["mimeType"], file.get("modifiedTime"), folder_path)
+            )
+        return drive_files
+
     def _download_files_in_folder(self, folder_id, target_dir):
         downloaded_file_count = 0
         skipped_file_count = 0

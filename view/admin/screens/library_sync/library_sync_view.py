@@ -9,8 +9,14 @@ The runner is on the portal rather than here because a screen is rebuilt on
 every navigation and a reset takes minutes - see
 view/admin/screens/library_sync/library_reset_runner.py.
 
-Sync is still presentation only: every step is drawn pending and Scan does
-nothing. It needs a `file` table and a planner service that do not exist yet.
+Sync is wired too, as two runs rather than one: Scan asks
+`SyncPlannerService` what changed and lists it, and Update applies only the
+rows still ticked. Both runs go through `AdminPortal.sync_runner`, which also
+holds the scan result so a plan survives navigating away.
+
+Nothing about a scan is persisted. A run is re-derived from Drive, the
+converted folder and the collection every time, so the screen can never apply
+a verdict that has gone stale while it sat open.
 """
 
 from pathlib import Path
@@ -20,10 +26,12 @@ import flet as ft
 from constant.settings import EMBEDDING_MODEL, PATHS_INPUT_DIR, PATHS_OUTPUT_DIR
 from services.SettingService import settingService
 from services.library_reset_service.library_reset_service import LibraryResetService
-from view.admin.screens.library_sync.library_reset_runner import STEP_COUNT, LibraryResetRunner
+from view.admin.screens.library_sync.library_reset_runner import LibraryResetRunner
+from view.admin.screens.library_sync.library_sync_runner import LibrarySyncRunner
 from view.base_view import BaseView
 from view.theme import Field, Radius, Space, palette, tone
 from view.ui_thread import control_update
+from view.widgets.blocks.file_icon import FileIcon
 from view.widgets.blocks.page_header import PageHeader
 from view.widgets.blocks.row_label import RowLabel
 from view.widgets.blocks.step_card import StepCard
@@ -57,6 +65,31 @@ RESULT_TILES = [
     ("Failed", ("download_failed", "convert_failed", "embed_failed"), "danger"),
 ]
 
+#: What an update did, for the tiles after a Sync run.
+UPDATE_TILES = [
+    ("Selected", ("selected",), "primary"),
+    ("Downloaded", ("downloaded",), "primary"),
+    ("Images read", ("converted_images",), "primary"),
+    ("Embedded", ("embedded",), "success"),
+    ("Removed", ("removed",), "warning"),
+    ("Failed", ("download_failed", "embed_failed"), "danger"),
+]
+
+#: scan status -> (row label, tone, whether an update acts on it). The one
+#: place a status becomes words - `FileChange` carries the bare value.
+STATUS_META = {
+    "added": ("New on Drive", "success"),
+    "updated": ("Changed on Drive", "primary"),
+    "stale_local": ("Converted, not embedded", "warning"),
+    "removed": ("Gone from Drive", "danger"),
+    "unsupported": ("Cannot be embedded", "neutral"),
+    "unchanged": ("Up to date", "neutral"),
+}
+
+#: The order the review list groups the statuses in - what needs doing first,
+#: what is only informational last.
+STATUS_ORDER = ["added", "updated", "stale_local", "removed", "unsupported", "unchanged"]
+
 #: The pill icon for each run state, keyed by the tone the runner reports.
 RUN_ICONS = {
     "neutral": ft.Icons.PAUSE_CIRCLE_OUTLINE_ROUNDED,
@@ -77,13 +110,19 @@ class LibrarySyncView(BaseView):
         # The run outlives this screen, so it is kept on the portal. Standing
         # one up here keeps the screen buildable on its own, in a test.
         self.runner = portal.reset_runner if portal is not None else LibraryResetRunner()
+        self.sync_runner = portal.sync_runner if portal is not None else LibrarySyncRunner()
         self.run_log_section = None
 
     def build(self):
-        # The run redraws through whichever screen is showing. The log has its
-        # own hook, so a line does not rebuild the screen hundreds of times.
+        # Both runs redraw through whichever screen is showing. The log has
+        # its own hook, so a line does not rebuild the screen hundreds of
+        # times. Both are attached whatever mode is showing: a run carries on
+        # while you look at the other tab, and has to find the screen when
+        # you come back to it.
         self.runner.on_change = self.refresh
         self.runner.on_log = self.refresh_log
+        self.sync_runner.on_change = self.refresh
+        self.sync_runner.on_log = self.refresh_log
         self.body_container.content = self.build_layout()
         return self.body_container
 
@@ -113,28 +152,51 @@ class LibrarySyncView(BaseView):
     def cancel_reset(self, _):
         self.runner.request_cancel()
 
+    def start_scan(self, e):
+        """Dispatches the scan; nothing here waits for it."""
+        if self.sync_runner.is_running:
+            return
+        self.sync_runner.begin_scan()
+        e.control.page.run_thread(self.sync_runner.run_scan)
+
+    def start_update(self, e):
+        """Applies the ticked rows. No confirmation: an update is additive
+        except for the removals, and those are only ever ticked deliberately."""
+        if self.sync_runner.is_running or not self.sync_runner.selected_changes:
+            return
+        self.sync_runner.begin_update()
+        e.control.page.run_thread(self.sync_runner.run_update)
+
+    def cancel_sync(self, _):
+        self.sync_runner.request_cancel()
+
     def dismiss_error(self, _=None):
         self.runner.error = None
+        self.sync_runner.error = None
         self.refresh()
 
     # --- layout --------------------------------------------------------------
 
     def build_layout(self):
+        runner = self.runner if self.mode == "reset" else self.sync_runner
         blocks = [
-            SyncHeader(self.mode, self.runner, self.select_mode),
+            SyncHeader(self.mode, runner, self.select_mode),
             ft.Container(height=Space.XL),
         ]
 
+        if runner.error is not None:
+            failed_run = "Reset" if self.mode == "reset" else "Sync"
+            blocks += [
+                NoticeBar(f"{failed_run} failed: {runner.error}", "danger",
+                          on_hide=self.dismiss_error),
+                ft.Container(height=Space.LG),
+            ]
+
         if self.mode == "reset":
-            if self.runner.error is not None:
-                blocks += [
-                    NoticeBar(f"Reset failed: {self.runner.error}", "danger",
-                              on_hide=self.dismiss_error),
-                    ft.Container(height=Space.LG),
-                ]
             section = ResetStepsSection(self.runner, self._open_dialog, self.cancel_reset)
         else:
-            section = ScanStepsSection(self.runner)
+            section = ScanStepsSection(self.sync_runner, self.start_scan, self.start_update,
+                                       self.cancel_sync)
 
         # The mode's section owns its own log, so take whichever one is showing.
         self.run_log_section = section.run_log_section
@@ -299,19 +361,21 @@ class SyncHeader(ft.Column):
         if self.mode == "reset":
             heading = "Reset library"
             description = "Full rebuild - use it for a first run or when the store is out of sync."
-
-            if self.runner.is_running:
-                if self.runner.cancel_requested:
-                    # Cancel is only checked between steps, so the one already
-                    # running has to finish. Saying so beats a button that
-                    # looks broken for the next two minutes.
-                    description = "Cancelling - the step already running has to finish first."
-                else:
-                    description = (f"Step {self.runner.step_number or 1} of {STEP_COUNT} - "
-                                   "leaving this screen will not stop it.")
         else:
             heading = "Sync library"
             description = "Scan for what changed, then update only the files you pick."
+
+        if self.runner.is_running:
+            if self.runner.cancel_requested:
+                # Cancel is only checked between steps, so the one already
+                # running has to finish. Saying so beats a button that looks
+                # broken for the next two minutes.
+                description = "Cancelling - the step already running has to finish first."
+            else:
+                description = (
+                    f"Step {self.runner.step_number or 1} of {self.runner.step_count} - "
+                    "leaving this screen will not stop it."
+                )
 
         tabs = []
         for key, text, icon in MODES:
@@ -367,58 +431,279 @@ class SyncHeader(ft.Column):
 class ScanStepsSection(ft.Column):
     """Everything Sync mode shows below the header.
 
-    Its own run button, the steps a scan walks, and its own run log - the two
-    modes do not share one, so switching between them does not carry the
-    other's output across.
+    Two runs, one section: Scan fills the review list, and Update applies
+    whatever is still ticked in it. They share the steps card and the run log,
+    which read the runner and so describe whichever of the two is going.
     """
 
-    SCAN_STAGES = [
-        ("Walk the local mirror", "Compares each source file's mtime to its converted .txt."),
-        ("Fetch Drive listing", "Recursive read-only walk of the configured Drive folder."),
-        ("Diff against the collection",
-        "Splits the listing into added, updated, removed and unchanged."),
+    #: What each scan step looks at. The steps are *named* by
+    #: `SyncPlannerService.SCAN_STEPS` and only explained here, so the names
+    #: cannot drift from the ones `on_step` hands back.
+    SCAN_DESCRIPTIONS = [
+        "Reads {output_dir} to find text that was converted but never embedded.",
+        "Recursive read-only walk of the Drive folder. Nothing is downloaded.",
+        "Splits it into new, changed, gone and up to date. Nothing is written.",
     ]
 
-    def __init__(self, runner):
+    #: And what each update step does.
+    UPDATE_DESCRIPTIONS = [
+        "Fetches only the ticked files again, one call per file.",
+        "Copies each one to {output_dir} and OCRs the images inside it.",
+        "Upserts what was fetched, and deletes the documents you ticked.",
+    ]
+
+    def __init__(self, runner, on_scan, on_update, on_cancel):
         super().__init__()
         self.runner = runner
+        self.on_scan = on_scan
+        self.on_update = on_update
+        self.on_cancel = on_cancel
         # Held so the screen can push log lines into it without a full redraw.
         self.run_log_section = RunLogSection(runner)
 
     def build(self):
-        self.controls = [
+        controls = [
             self.action_row(),
             ft.Container(height=Space.LG),
             self.steps_card(),
-            ft.Container(height=Space.LG),
-            self.run_log_section,
         ]
+        if self.runner.file_changes or self.runner.is_scanned:
+            controls += [ft.Container(height=Space.LG), self.review_card()]
+        if self.runner.results:
+            controls += [ft.Container(height=Space.LG), self.results_card()]
+        controls += [ft.Container(height=Space.LG), self.run_log_section]
+
+        self.controls = controls
         self.spacing = 0
 
-    @staticmethod
-    def action_row():
-        """Nothing behind it yet - Sync needs a `file` table and a planner."""
-        return ft.Row(
-            [PrimaryButton("Scan for changes", icon=ft.Icons.MANAGE_SEARCH_ROUNDED)]
-        )
+    def action_row(self):
+        """Scan, Update beside it once there is something to apply, or Cancel."""
+        if self.runner.is_running:
+            if self.runner.cancel_requested:
+                cancelling_button = GhostButton("Cancelling...",
+                                                icon=ft.Icons.HOURGLASS_TOP_ROUNDED)
+                cancelling_button.disabled = True
+                return ft.Row([cancelling_button])
+            return ft.Row([
+                GhostButton("Cancel", icon=ft.Icons.STOP_CIRCLE_OUTLINED,
+                            on_click=self.on_cancel)
+            ])
+
+        buttons = [
+            PrimaryButton("Scan for changes", icon=ft.Icons.MANAGE_SEARCH_ROUNDED,
+                          on_click=self.on_scan)
+        ]
+        if self.runner.actionable_changes:
+            selected_count = len(self.runner.selected_changes)
+            update_button = PrimaryButton(
+                f"Update {selected_count} file{'' if selected_count == 1 else 's'}",
+                icon=ft.Icons.CLOUD_SYNC_ROUNDED,
+                tone_name="success",
+                on_click=self.on_update,
+            )
+            # Nothing ticked is a state worth showing rather than hiding: the
+            # button says what it would do, and says it would do nothing.
+            update_button.disabled = not selected_count
+            buttons.append(update_button)
+
+        return ft.Row(buttons, spacing=Space.MD)
 
     def steps_card(self):
+        stages = self.stages()
+        pill_text, pill_tone = self.runner.summary()
+        is_update = self.runner.run_type == "update"
         return SectionCard(
-            "Scan steps",
-            "What a scan looks at, in order. Nothing is written.",
-            trailing=Pill("Idle", "neutral", ft.Icons.PAUSE_CIRCLE_OUTLINE_ROUNDED),
+            "Update steps" if is_update else "Scan steps",
+            "What an update does, in order." if is_update
+            else "What a scan looks at, in order. Nothing is written.",
+            trailing=Pill(pill_text, pill_tone, RUN_ICONS[pill_tone]),
             # One line to read across, scrolling sideways when it does not
             # fit. See ResetStepsSection.steps_card for why it is not a grid.
             content=ft.Row(
                 [
-                    StepCard(index, name, description)
-                    for index, (name, description) in enumerate(ScanStepsSection.SCAN_STAGES)
+                    StepCard(index, name, description, self.runner.step_status(index))
+                    for index, (name, description) in enumerate(stages)
                 ],
                 spacing=Space.MD,
                 scroll=ft.ScrollMode.AUTO,
                 vertical_alignment=ft.CrossAxisAlignment.START,
             ),
         )
+
+    def stages(self):
+        """The steps of whichever run is showing, named by the service.
+
+        The output folder is read from the setting table rather than written
+        into the text, for the same reason the reset steps read theirs -
+        naming a folder a run will not touch is worse than naming none.
+        """
+        values = {"output_dir": settingService.find_active_by_key(PATHS_OUTPUT_DIR)}
+        descriptions = (ScanStepsSection.UPDATE_DESCRIPTIONS
+                        if self.runner.run_type == "update"
+                        else ScanStepsSection.SCAN_DESCRIPTIONS)
+        return [
+            (name, description.format(**values))
+            for name, description in zip(self.runner.steps, descriptions)
+        ]
+
+    def review_card(self):
+        """What the scan found, grouped by status, with the ticks."""
+        actionable_changes = self.runner.actionable_changes
+        if not self.runner.file_changes:
+            return SectionCard(
+                "Review",
+                "What the last scan found.",
+                content=EmptyState(
+                    ft.Icons.CHECK_CIRCLE_OUTLINE_ROUNDED,
+                    "Nothing to do",
+                    "Drive and the collection agree - every file is up to date.",
+                    height=200,
+                ),
+            )
+
+        selected_count = len(self.runner.selected_changes)
+        return SectionCard(
+            "Review",
+            f"{len(self.runner.file_changes)} file(s) walked, "
+            f"{len(actionable_changes)} the update can act on.",
+            trailing=Pill(f"{selected_count} ticked",
+                          "primary" if selected_count else "neutral"),
+            content=ft.Column(
+                [self.select_all_row()] + self.status_groups(),
+                spacing=Space.SM,
+            ),
+        )
+
+    def select_all_row(self):
+        """Tick or untick everything an update could act on."""
+        is_all_selected = (
+            len(self.runner.selected_changes) == len(self.runner.actionable_changes)
+        )
+        return ft.Row(
+            [
+                GhostButton(
+                    "Untick all" if is_all_selected else "Tick all actionable",
+                    icon=(ft.Icons.CHECK_BOX_OUTLINE_BLANK_ROUNDED if is_all_selected
+                          else ft.Icons.CHECK_BOX_ROUNDED),
+                    is_dense=True,
+                    on_click=lambda _: self.runner.select_all(not is_all_selected),
+                )
+            ]
+        )
+
+    def status_groups(self):
+        """One labelled block per status that has any files in it."""
+        changes_by_status = {}
+        for file_change in self.runner.file_changes:
+            changes_by_status.setdefault(file_change.status, []).append(file_change)
+
+        blocks = []
+        for status in STATUS_ORDER:
+            file_changes = changes_by_status.get(status)
+            if not file_changes:
+                continue
+            label, tone_name = STATUS_META[status]
+            blocks.append(
+                ft.Column(
+                    [
+                        ft.Row(
+                            [
+                                Pill(f"{label} - {len(file_changes)}", tone_name),
+                            ],
+                        ),
+                        # Its own scroll, so a folder of 300 unchanged files
+                        # cannot push the run log off the bottom of the page.
+                        ft.Container(
+                            content=ft.Column(
+                                [ChangeRow(file_change, self.runner)
+                                 for file_change in file_changes],
+                                spacing=2,
+                                scroll=ft.ScrollMode.AUTO,
+                            ),
+                            height=min(len(file_changes), 6) * 40,
+                        ),
+                    ],
+                    spacing=Space.SM,
+                )
+            )
+        return blocks
+
+    def results_card(self):
+        """The counts the last update reported."""
+        span = {"xs": 6, "md": 4, "xl": 2}
+        return SectionCard(
+            "Last update",
+            "Counts reported by the services this update drove.",
+            content=ft.ResponsiveRow(
+                [
+                    ResultTile(label,
+                               sum(self.runner.results.get(key, 0) for key in keys),
+                               tone_name, span)
+                    for label, keys, tone_name in UPDATE_TILES
+                ],
+                spacing=Space.MD,
+                run_spacing=Space.MD,
+            ),
+        )
+
+
+class ChangeRow(ft.Container):
+    """One file the scan found, and whether an update will act on it.
+
+    A blocked or unchanged row still shows - knowing a file was walked and
+    deliberately left alone is the difference between a scan you can trust and
+    a list you have to take on faith - but it cannot be ticked.
+    """
+
+    def __init__(self, file_change, runner):
+        super().__init__()
+        self.file_change = file_change
+        self.runner = runner
+
+    def build(self):
+        p = palette()
+        _, tone_name = STATUS_META.get(self.file_change.status, ("", "neutral"))
+        fg, _ = tone(tone_name)
+
+        if self.file_change.is_actionable:
+            tick_icon = (ft.Icons.CHECK_BOX_ROUNDED if self.file_change.is_selected
+                         else ft.Icons.CHECK_BOX_OUTLINE_BLANK_ROUNDED)
+            tick_color = fg if self.file_change.is_selected else p.text_faint
+        else:
+            # Not an empty checkbox - that would read as "untick to skip",
+            # which is not a choice this row has.
+            tick_icon = ft.Icons.REMOVE_ROUNDED
+            tick_color = p.text_faint
+
+        row = ft.Row(
+            [
+                ft.Icon(tick_icon, size=18, color=tick_color),
+                FileIcon(self.file_change.kind, size=22),
+                ft.Column(
+                    [
+                        ft.Text(self.file_change.name, size=12, weight=ft.FontWeight.W_600,
+                                color=p.text, max_lines=1,
+                                overflow=ft.TextOverflow.ELLIPSIS),
+                        Mono(self.file_change.folder or "top level", size=10,
+                             color=p.text_faint),
+                    ],
+                    spacing=0,
+                    expand=True,
+                ),
+                ft.Text(self.file_change.modified, size=11, color=p.text_muted),
+            ],
+            spacing=Space.MD,
+            vertical_alignment=ft.CrossAxisAlignment.CENTER,
+        )
+
+        self.content = PointerArea(
+            ft.Container(content=row, padding=ft.Padding.symmetric(
+                horizontal=Space.SM, vertical=Space.XS)),
+            is_clickable=self.file_change.is_actionable and not self.runner.is_running,
+            on_click=lambda _: self.runner.toggle(self.file_change),
+            hover_bgcolor=p.surface_high,
+        )
+        self.border_radius = Radius.SM
 
 
 class ResetStepsSection(ft.Column):
