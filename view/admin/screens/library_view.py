@@ -17,6 +17,7 @@ from constant.settings import EMBEDDING_COLLECTION
 from services.SettingService import settingService
 from services.library_service.library_service import LibraryService
 from view.base_view import BaseView
+from view.clipboard import copy_to_clipboard
 from view.theme import Field, Radius, Space, palette
 from view.widgets.blocks.file_icon import FileIcon
 from view.widgets.blocks.page_header import PageHeader
@@ -379,8 +380,16 @@ class DocumentsSection(SectionCard):
                     ft.Container(content=Pill(kind, kind_tone), width=TYPE_WIDTH),
                     ft.Row(
                         [
-                            IconButton(ft.Icons.CONTENT_COPY_ROUNDED, "Copy document id"),
-                            IconButton(ft.Icons.OPEN_IN_NEW_ROUNDED, "Open in Google Drive"),
+                            IconButton(ft.Icons.CONTENT_COPY_ROUNDED, "Copy document id",
+                                       lambda e, d=document: copy_to_clipboard(
+                                           e.control, d.document_id, "the document id")),
+                            # Not wired, and cannot be from here: a Drive URL
+                            # needs the Drive file id, and the collection
+                            # stores the converted path as its id instead.
+                            # It comes back with the `file` table, which is
+                            # where drive_id would be kept.
+                            IconButton(ft.Icons.OPEN_IN_NEW_ROUNDED,
+                                       "Open in Google Drive - needs the file table"),
                         ],
                         spacing=0,
                         width=ACTIONS_WIDTH,

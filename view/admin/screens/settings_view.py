@@ -33,6 +33,7 @@ from constant.settings import (
 )
 from services.SettingService import settingService
 from view.base_view import BaseView
+from view.clipboard import copy_to_clipboard
 from view.theme import Radius, Space, palette
 from view.widgets.blocks.page_header import PageHeader
 from view.widgets.blocks.row_label import RowLabel
@@ -274,7 +275,12 @@ class PathsSectionCard(SectionCard):
                                 content=Mono(paths.base_dir, size=12, color=p.text),
                                 expand=True,
                             ),
-                            IconButton(ft.Icons.CONTENT_COPY_ROUNDED, "Copy base directory"),
+                            # The value is read when the button is pressed, not
+                            # when the row is built, so an edited path copies
+                            # as it reads on screen rather than as it is saved.
+                            IconButton(ft.Icons.CONTENT_COPY_ROUNDED, "Copy base directory",
+                                       lambda e: copy_to_clipboard(
+                                           e.control, paths.base_dir, "the base directory")),
                         ],
                         vertical_alignment=ft.CrossAxisAlignment.CENTER,
                     ),
@@ -283,7 +289,10 @@ class PathsSectionCard(SectionCard):
                             RowLabel("Source files"),
                             TextInput(paths.input_dir, is_mono=True,
                                       on_change=self.edit_input_dir),
-                            IconButton(ft.Icons.CONTENT_COPY_ROUNDED, "Copy source files"),
+                            IconButton(ft.Icons.CONTENT_COPY_ROUNDED, "Copy source files",
+                                       lambda e: copy_to_clipboard(
+                                           e.control, paths.input_dir,
+                                           "the source files path")),
                         ],
                         vertical_alignment=ft.CrossAxisAlignment.CENTER,
                     ),
@@ -292,7 +301,10 @@ class PathsSectionCard(SectionCard):
                             RowLabel("Converted files"),
                             TextInput(paths.output_dir, is_mono=True,
                                       on_change=self.edit_output_dir),
-                            IconButton(ft.Icons.CONTENT_COPY_ROUNDED, "Copy converted files"),
+                            IconButton(ft.Icons.CONTENT_COPY_ROUNDED, "Copy converted files",
+                                       lambda e: copy_to_clipboard(
+                                           e.control, paths.output_dir,
+                                           "the converted files path")),
                         ],
                         vertical_alignment=ft.CrossAxisAlignment.CENTER,
                     ),
@@ -301,7 +313,10 @@ class PathsSectionCard(SectionCard):
                             RowLabel("Chroma store"),
                             TextInput(paths.chroma_store, is_mono=True,
                                       on_change=self.edit_chroma_store),
-                            IconButton(ft.Icons.CONTENT_COPY_ROUNDED, "Copy chroma store"),
+                            IconButton(ft.Icons.CONTENT_COPY_ROUNDED, "Copy chroma store",
+                                       lambda e: copy_to_clipboard(
+                                           e.control, paths.chroma_store,
+                                           "the chroma store path")),
                         ],
                         vertical_alignment=ft.CrossAxisAlignment.CENTER,
                     ),
@@ -411,7 +426,9 @@ class DriveSectionCard(SectionCard):
                             RowLabel("Folder id"),
                             TextInput(drive.folder_id, is_mono=True,
                                       on_change=self.edit_folder_id),
-                            IconButton(ft.Icons.CONTENT_COPY_ROUNDED, "Copy folder id"),
+                            IconButton(ft.Icons.CONTENT_COPY_ROUNDED, "Copy folder id",
+                                       lambda e: copy_to_clipboard(
+                                           e.control, drive.folder_id, "the folder id")),
                         ],
                         vertical_alignment=ft.CrossAxisAlignment.CENTER,
                     ),
@@ -420,7 +437,12 @@ class DriveSectionCard(SectionCard):
                             RowLabel("Service account key"),
                             TextInput(drive.service_account_file, is_mono=True,
                                       on_change=self.edit_service_account_file),
-                            IconButton(ft.Icons.CONTENT_COPY_ROUNDED, "Copy service account key"),
+                            # The path to the key, never its contents - this
+                            # copies where the credentials live, not them.
+                            IconButton(ft.Icons.CONTENT_COPY_ROUNDED, "Copy service account key",
+                                       lambda e: copy_to_clipboard(
+                                           e.control, drive.service_account_file,
+                                           "the service account key path")),
                         ],
                         vertical_alignment=ft.CrossAxisAlignment.CENTER,
                     ),
@@ -527,7 +549,9 @@ class EmbeddingSectionCard(SectionCard):
                                 content=Mono(embedding.model, size=12, color=p.text),
                                 expand=True,
                             ),
-                            IconButton(ft.Icons.CONTENT_COPY_ROUNDED, "Copy model name"),
+                            IconButton(ft.Icons.CONTENT_COPY_ROUNDED, "Copy model name",
+                                       lambda e: copy_to_clipboard(
+                                           e.control, embedding.model, "the model name")),
                         ],
                         vertical_alignment=ft.CrossAxisAlignment.CENTER,
                     ),
@@ -556,7 +580,10 @@ class EmbeddingSectionCard(SectionCard):
                             RowLabel("Results per query"),
                             TextInput(embedding.results_per_query, is_mono=True,
                                       on_change=self.edit_results_per_query),
-                            IconButton(ft.Icons.CONTENT_COPY_ROUNDED, "Copy results per query"),
+                            IconButton(ft.Icons.CONTENT_COPY_ROUNDED, "Copy results per query",
+                                       lambda e: copy_to_clipboard(
+                                           e.control, embedding.results_per_query,
+                                           "the results per query")),
                         ],
                         vertical_alignment=ft.CrossAxisAlignment.CENTER,
                     ),

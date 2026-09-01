@@ -14,6 +14,7 @@ import flet as ft
 
 from services.search_service.search_service import searchService
 from view.base_view import BaseView
+from view.clipboard import copy_to_clipboard
 from view.theme import Radius, Space, palette
 from view.ui_thread import is_mounted, control_update
 from view.user.search_sidebar import SearchSidebar
@@ -363,7 +364,13 @@ class FileHeader(Card):
                     ),
                     ft.Text(result.modified, size=10, color=p.text_faint,
                             tooltip=f"{result.kind} - modified {result.modified}"),
-                    IconButton(ft.Icons.LINK_ROUNDED, "Copy Drive link"),
+                    # Was "Copy Drive link", which this cannot do: a Drive URL
+                    # needs the Drive file id and the collection stores the
+                    # converted path as its id. The path is what the row
+                    # already shows, so that is what it copies.
+                    IconButton(ft.Icons.CONTENT_COPY_ROUNDED, "Copy document id",
+                               lambda e, r=result: copy_to_clipboard(
+                                   e.control, r.document_id, "the document id")),
                     PrimaryButton("Open in Google Drive", icon=ft.Icons.OPEN_IN_NEW_ROUNDED,
                                   is_dense=True),
                 ],

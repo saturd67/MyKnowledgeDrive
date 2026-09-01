@@ -29,6 +29,7 @@ from services.library_reset_service.library_reset_service import LibraryResetSer
 from view.admin.screens.library_sync.library_reset_runner import LibraryResetRunner
 from view.admin.screens.library_sync.library_sync_runner import LibrarySyncRunner
 from view.base_view import BaseView
+from view.clipboard import copy_to_clipboard
 from view.theme import Field, Radius, Space, palette, tone
 from view.ui_thread import control_update
 from view.widgets.blocks.file_icon import FileIcon
@@ -894,11 +895,20 @@ class RunLogSection(SectionCard):
         super().__init__(
             "Run log",
             "Mirrors what the services log while a run is in progress.",
-            trailing=IconButton(ft.Icons.CONTENT_COPY_ROUNDED, "Copy the run log"),
+            trailing=IconButton(ft.Icons.CONTENT_COPY_ROUNDED, "Copy the run log",
+                                self.copy_log),
             content=body,
         )
         self.runner = runner
         self.log_list = log_list
+
+    def copy_log(self, e):
+        """The whole log as text, for pasting into a bug report.
+
+        Every line the runner still holds, not just the ones on screen - the
+        deque is capped at MAX_LOG_LINES and the list only renders what fits.
+        """
+        copy_to_clipboard(e.control, "\n".join(self.runner.lines), "the run log")
 
     @staticmethod
     def log_lines(runner):
