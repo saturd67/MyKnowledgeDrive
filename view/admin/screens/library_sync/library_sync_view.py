@@ -110,7 +110,7 @@ class LibrarySyncView(BaseView):
         self.body_container = ft.Container()
         # The run outlives this screen, so it is kept on the portal. Standing
         # one up here keeps the screen buildable on its own, in a test.
-        self.runner = portal.reset_runner if portal is not None else LibraryResetRunner()
+        self.reset_runner = portal.reset_runner if portal is not None else LibraryResetRunner()
         self.sync_runner = portal.sync_runner if portal is not None else LibrarySyncRunner()
         self.run_log_section = None
 
@@ -120,8 +120,8 @@ class LibrarySyncView(BaseView):
         # times. Both are attached whatever mode is showing: a run carries on
         # while you look at the other tab, and has to find the screen when
         # you come back to it.
-        self.runner.on_change = self.refresh
-        self.runner.on_log = self.refresh_log
+        self.reset_runner.on_change = self.refresh
+        self.reset_runner.on_log = self.refresh_log
         self.sync_runner.on_change = self.refresh
         self.sync_runner.on_log = self.refresh_log
         self.body_container.content = self.build_layout()
@@ -139,53 +139,15 @@ class LibrarySyncView(BaseView):
         self.mode = mode
         self.refresh()
 
-    # --- the run -------------------------------------------------------------
-
-    def start_reset(self, e):
-        """Dispatches onto a worker thread; nothing here waits for it."""
-        page = e.control.page
-        page.pop_dialog()
-        if self.runner.is_running:
-            return
-        self.runner.begin()
-        page.run_thread(self.runner.run)
-
-    def cancel_reset(self, _):
-        self.runner.request_cancel()
-
-    def start_scan(self, e):
-        """Dispatches the scan; nothing here waits for it."""
-        if self.sync_runner.is_running:
-            return
-        # The page first, and this order is load-bearing: `begin_scan` redraws
-        # the screen, which replaces the very button that was clicked, and
-        # `Control.page` raises once a control is off the page.
-        page = e.control.page
-        self.sync_runner.begin_scan()
-        page.run_thread(self.sync_runner.run_scan)
-
-    def start_update(self, e):
-        """Applies the ticked rows. No confirmation: an update is additive
-        except for the removals, and those are only ever ticked deliberately."""
-        if self.sync_runner.is_running or not self.sync_runner.selected_changes:
-            return
-        # Read before `begin_update` redraws this button away - see start_scan.
-        page = e.control.page
-        self.sync_runner.begin_update()
-        page.run_thread(self.sync_runner.run_update)
-
-    def cancel_sync(self, _):
-        self.sync_runner.request_cancel()
-
     def dismiss_error(self, _=None):
-        self.runner.error = None
+        self.reset_runner.error = None
         self.sync_runner.error = None
         self.refresh()
 
     # --- layout --------------------------------------------------------------
 
     def build_layout(self):
-        runner = self.runner if self.mode == "reset" else self.sync_runner
+        runner = self.reset_runner if self.mode == "reset" else self.sync_runner
         blocks = [
             SyncHeader(self.mode, runner, self.select_mode),
             ft.Container(height=Space.XL),
@@ -199,154 +161,19 @@ class LibrarySyncView(BaseView):
                 ft.Container(height=Space.LG),
             ]
 
+        # Each section drives its own runner, so it is handed the runner and
+        # nothing else. What starting a run redraws is not this screen's to
+        # arrange either: `begin` reports through `on_change`, wired above.
         if self.mode == "reset":
-            section = ResetStepsSection(self.runner, self._open_dialog, self.cancel_reset)
+            section = ResetStepsSection(self.reset_runner)
         else:
-            section = ScanStepsSection(self.sync_runner, self.start_scan, self.start_update,
-                                       self.cancel_sync)
+            section = ScanStepsSection(self.sync_runner)
 
         # The mode's section owns its own log, so take whichever one is showing.
         self.run_log_section = section.run_log_section
         blocks.append(section)
 
         return ft.Column(blocks, spacing=0)
-
-    # --- reset confirmation --------------------------------------------------
-
-    @staticmethod
-    def source_file_count():
-        """Files under the input folder, walked when the dialog opens.
-
-        "unknown" rather than an error if the folder is not there: the dialog
-        is not where a bad path should be discovered, and the run reports one
-        properly.
-        """
-        try:
-            input_dir = Path(settingService.get_path(PATHS_INPUT_DIR))
-            if not input_dir.is_dir():
-                return "unknown"
-            return str(sum(1 for path in input_dir.rglob("*") if path.is_file()))
-        except OSError:
-            return "unknown"
-
-    def _open_dialog(self, e):
-        """Everything destructive about a reset, in one place.
-
-        The screen used to carry a warning banner, a panel of what a reset
-        touches and a separate confirm box. All three said the same thing to
-        someone who was not about to press the button, so they live here now -
-        on the one screen where a reset is actually being started.
-        """
-        p = self.p
-        page = e.control.page
-
-        confirm_button = PrimaryButton("Yes, reset", tone_name="danger",
-                                       on_click=self.start_reset)
-        confirm_button.disabled = True
-
-        def on_change(e):
-            is_armed = e.control.value.strip() == CONFIRM_WORD
-            if confirm_button.disabled != (not is_armed):
-                confirm_button.disabled = not is_armed
-                confirm_button.update()
-            # The border follows the field, not the button, so it always says
-            # whether what has been typed counts.
-            e.control.border_color = p.danger if is_armed else p.border
-            e.control.update()
-
-        page.show_dialog(
-            ft.AlertDialog(
-                modal=True,
-                bgcolor=p.surface,
-                shape=ft.RoundedRectangleBorder(radius=Radius.LG),
-                title=ft.Row(
-                    [
-                        IconBadge(ft.Icons.WARNING_AMBER_ROUNDED, "danger", size=36, icon_size=18),
-                        ft.Text("Reset library?", size=16, weight=ft.FontWeight.W_700,
-                                color=p.text),
-                    ],
-                    spacing=Space.MD,
-                ),
-                content=ft.Container(
-                    content=ft.Column(
-                        [
-                            ft.Text(
-                                "This cannot be undone. The downloaded sources, the converted "
-                                "text and every embedding are deleted before the rebuild "
-                                "starts, and a full run takes a few minutes because each "
-                                ".docx and image is OCR'd again.",
-                                size=13,
-                                color=p.text_muted,
-                            ),
-                            Divider(),
-                            ft.Row(
-                                [
-                                    RowLabel("Files to convert"),
-                                    ft.Container(
-                                        content=ft.Text(self.source_file_count(), size=13,
-                                                        color=p.text),
-                                        expand=True,
-                                    ),
-                                ],
-                                vertical_alignment=ft.CrossAxisAlignment.CENTER,
-                            ),
-                            ft.Row(
-                                [
-                                    RowLabel("Embedding model"),
-                                    ft.Container(
-                                        content=Mono(
-                                            settingService.find_active_by_key(EMBEDDING_MODEL),
-                                            size=12, color=p.text),
-                                        expand=True,
-                                    ),
-                                ],
-                                vertical_alignment=ft.CrossAxisAlignment.CENTER,
-                            ),
-                            ft.Row(
-                                [
-                                    RowLabel("Last reset"),
-                                    ft.Container(
-                                        # Nothing records a finished run yet -
-                                        # that is plans/sync-run-table.md.
-                                        content=ft.Text("never", size=13, color=p.text_muted),
-                                        expand=True,
-                                    ),
-                                ],
-                                vertical_alignment=ft.CrossAxisAlignment.CENTER,
-                            ),
-                            Divider(),
-                            ft.Text(f"Type {CONFIRM_WORD} to enable the button below.",
-                                    size=12, color=p.text_muted),
-                            ft.TextField(
-                                hint_text=f"Type {CONFIRM_WORD} to enable",
-                                hint_style=ft.TextStyle(size=Field.TEXT_SIZE, color=p.text_faint),
-                                prefix_icon=ft.Icons.LOCK_OUTLINE_ROUNDED,
-                                text_size=Field.TEXT_SIZE,
-                                width=Field.WIDTH,
-                                height=Field.HEIGHT,
-                                dense=True,
-                                autofocus=True,
-                                content_padding=Field.padding(),
-                                filled=True,
-                                fill_color=p.surface_alt,
-                                border_color=p.border,
-                                focused_border_color=p.danger,
-                                border_radius=Radius.MD,
-                                on_change=on_change,
-                            ),
-                        ],
-                        spacing=Space.MD,
-                        tight=True,
-                    ),
-                    width=380,
-                ),
-                actions=[
-                    GhostButton("Cancel", on_click=lambda _: page.pop_dialog()),
-                    confirm_button,
-                ],
-                actions_alignment=ft.MainAxisAlignment.END,
-            )
-        )
 
 
 class SyncHeader(ft.Column):
@@ -459,14 +286,39 @@ class ScanStepsSection(ft.Column):
         "Upserts what was fetched, and deletes the documents you ticked.",
     ]
 
-    def __init__(self, runner, on_scan, on_update, on_cancel):
+    def __init__(self, runner: LibrarySyncRunner):
         super().__init__()
         self.runner = runner
-        self.on_scan = on_scan
-        self.on_update = on_update
-        self.on_cancel = on_cancel
         # Held so the screen can push log lines into it without a full redraw.
         self.run_log_section = RunLogSection(runner)
+
+    # --- the runs ------------------------------------------------------------
+
+    def start_scan(self, e):
+        """Dispatches the scan; nothing here waits for it."""
+        if self.runner.is_running:
+            return
+        # The page first, and this order is load-bearing: `begin_scan` redraws
+        # the screen, which replaces this whole section and the very button
+        # that was clicked, and `Control.page` raises once a control is off
+        # the page. `self.page` is no safer here than `e.control.page` - the
+        # section goes with the button.
+        page = e.control.page
+        self.runner.begin_scan()
+        page.run_thread(self.runner.run_scan)
+
+    def start_update(self, e):
+        """Applies the ticked rows. No confirmation: an update is additive
+        except for the removals, and those are only ever ticked deliberately."""
+        if self.runner.is_running or not self.runner.selected_changes:
+            return
+        # Read before `begin_update` redraws this button away - see start_scan.
+        page = e.control.page
+        self.runner.begin_update()
+        page.run_thread(self.runner.run_update)
+
+    def cancel_scan(self, _):
+        self.runner.request_cancel()
 
     def build(self):
         controls = [
@@ -493,12 +345,12 @@ class ScanStepsSection(ft.Column):
                 return ft.Row([cancelling_button])
             return ft.Row([
                 GhostButton("Cancel", icon=ft.Icons.STOP_CIRCLE_OUTLINED,
-                            on_click=self.on_cancel)
+                            on_click=self.cancel_scan)
             ])
 
-        buttons = [
+        row_controls = [
             PrimaryButton("Scan for changes", icon=ft.Icons.MANAGE_SEARCH_ROUNDED,
-                          on_click=self.on_scan)
+                          on_click=self.start_scan)
         ]
         if self.runner.actionable_changes:
             selected_count = len(self.runner.selected_changes)
@@ -506,14 +358,14 @@ class ScanStepsSection(ft.Column):
                 f"Update {selected_count} file{'' if selected_count == 1 else 's'}",
                 icon=ft.Icons.CLOUD_SYNC_ROUNDED,
                 tone_name="success",
-                on_click=self.on_update,
+                on_click=self.start_update,
             )
             # Nothing ticked is a state worth showing rather than hiding: the
             # button says what it would do, and says it would do nothing.
             update_button.disabled = not selected_count
-            buttons.append(update_button)
+            row_controls.append(update_button)
 
-        return ft.Row(buttons, spacing=Space.MD)
+        return ft.Row(row_controls, spacing=Space.MD)
 
     def steps_card(self):
         stages = self.stages()
@@ -734,13 +586,25 @@ class ResetStepsSection(ft.Column):
         "All converted text is embedded back into the store.",
     ]
 
-    def __init__(self, runner, on_reset, on_cancel):
+    def __init__(self, runner: LibraryResetRunner):
         super().__init__()
         self.runner = runner
-        self.on_reset = on_reset
-        self.on_cancel = on_cancel
         # Held so the screen can push log lines into it without a full redraw.
         self.run_log_section = RunLogSection(runner)
+
+    # --- the run -------------------------------------------------------------
+
+    def start_reset(self, e):
+        """Dispatches onto a worker thread; nothing here waits for it."""
+        page = e.control.page
+        page.pop_dialog()
+        if self.runner.is_running:
+            return
+        self.runner.begin()
+        page.run_thread(self.runner.run)
+
+    def cancel_reset(self, _):
+        self.runner.request_cancel()
 
     def build(self):
         controls = [
@@ -760,7 +624,7 @@ class ResetStepsSection(ft.Column):
         if not self.runner.is_running:
             return ft.Row([
                 PrimaryButton("Reset library", icon=ft.Icons.DELETE_FOREVER_ROUNDED,
-                              tone_name="danger", on_click=self.on_reset)
+                              tone_name="danger", on_click=self.open_confirmation)
             ])
 
         if self.runner.cancel_requested:
@@ -773,7 +637,8 @@ class ResetStepsSection(ft.Column):
             return ft.Row([cancelling_button])
 
         return ft.Row([
-            GhostButton("Cancel", icon=ft.Icons.STOP_CIRCLE_OUTLINED, on_click=self.on_cancel)
+            GhostButton("Cancel", icon=ft.Icons.STOP_CIRCLE_OUTLINED,
+                        on_click=self.cancel_reset)
         ])
 
     def steps_card(self):
@@ -835,6 +700,142 @@ class ResetStepsSection(ft.Column):
             for name, description in zip(LibraryResetService.STEPS, ResetStepsSection.RESET_DESCRIPTIONS)
         ]
 
+    # --- reset confirmation --------------------------------------------------
+
+    @staticmethod
+    def source_file_count():
+        """Files under the input folder, walked when the dialog opens.
+
+        "unknown" rather than an error if the folder is not there: the dialog
+        is not where a bad path should be discovered, and the run reports one
+        properly.
+        """
+        try:
+            input_dir = Path(settingService.get_path(PATHS_INPUT_DIR))
+            if not input_dir.is_dir():
+                return "unknown"
+            return str(sum(1 for path in input_dir.rglob("*") if path.is_file()))
+        except OSError:
+            return "unknown"
+
+    def open_confirmation(self, e):
+        """Everything destructive about a reset, in one place.
+
+        The screen used to carry a warning banner, a panel of what a reset
+        touches and a separate confirm box. All three said the same thing to
+        someone who was not about to press the button, so they live here now -
+        beside the button that actually starts one.
+        """
+        p = palette()
+        page = e.control.page
+
+        confirm_button = PrimaryButton("Yes, reset", tone_name="danger",
+                                       on_click=self.start_reset)
+        confirm_button.disabled = True
+
+        def on_change(e):
+            is_armed = e.control.value.strip() == CONFIRM_WORD
+            if confirm_button.disabled != (not is_armed):
+                confirm_button.disabled = not is_armed
+                confirm_button.update()
+            # The border follows the field, not the button, so it always says
+            # whether what has been typed counts.
+            e.control.border_color = p.danger if is_armed else p.border
+            e.control.update()
+
+        page.show_dialog(
+            ft.AlertDialog(
+                modal=True,
+                bgcolor=p.surface,
+                shape=ft.RoundedRectangleBorder(radius=Radius.LG),
+                title=ft.Row(
+                    [
+                        IconBadge(ft.Icons.WARNING_AMBER_ROUNDED, "danger", size=36, icon_size=18),
+                        ft.Text("Reset library?", size=16, weight=ft.FontWeight.W_700,
+                                color=p.text),
+                    ],
+                    spacing=Space.MD,
+                ),
+                content=ft.Container(
+                    content=ft.Column(
+                        [
+                            ft.Text(
+                                "This cannot be undone. The downloaded sources, the converted "
+                                "text and every embedding are deleted before the rebuild "
+                                "starts, and a full run takes a few minutes because each "
+                                ".docx and image is OCR'd again.",
+                                size=13,
+                                color=p.text_muted,
+                            ),
+                            Divider(),
+                            ft.Row(
+                                [
+                                    RowLabel("Files to convert"),
+                                    ft.Container(
+                                        content=ft.Text(self.source_file_count(), size=13,
+                                                        color=p.text),
+                                        expand=True,
+                                    ),
+                                ],
+                                vertical_alignment=ft.CrossAxisAlignment.CENTER,
+                            ),
+                            ft.Row(
+                                [
+                                    RowLabel("Embedding model"),
+                                    ft.Container(
+                                        content=Mono(
+                                            settingService.find_active_by_key(EMBEDDING_MODEL),
+                                            size=12, color=p.text),
+                                        expand=True,
+                                    ),
+                                ],
+                                vertical_alignment=ft.CrossAxisAlignment.CENTER,
+                            ),
+                            ft.Row(
+                                [
+                                    RowLabel("Last reset"),
+                                    ft.Container(
+                                        # Nothing records a finished run yet -
+                                        # that is plans/sync-run-table.md.
+                                        content=ft.Text("never", size=13, color=p.text_muted),
+                                        expand=True,
+                                    ),
+                                ],
+                                vertical_alignment=ft.CrossAxisAlignment.CENTER,
+                            ),
+                            Divider(),
+                            ft.Text(f"Type {CONFIRM_WORD} to enable the button below.",
+                                    size=12, color=p.text_muted),
+                            ft.TextField(
+                                hint_text=f"Type {CONFIRM_WORD} to enable",
+                                hint_style=ft.TextStyle(size=Field.TEXT_SIZE, color=p.text_faint),
+                                prefix_icon=ft.Icons.LOCK_OUTLINE_ROUNDED,
+                                text_size=Field.TEXT_SIZE,
+                                width=Field.WIDTH,
+                                height=Field.HEIGHT,
+                                dense=True,
+                                autofocus=True,
+                                content_padding=Field.padding(),
+                                filled=True,
+                                fill_color=p.surface_alt,
+                                border_color=p.border,
+                                focused_border_color=p.danger,
+                                border_radius=Radius.MD,
+                                on_change=on_change,
+                            ),
+                        ],
+                        spacing=Space.MD,
+                        tight=True,
+                    ),
+                    width=380,
+                ),
+                actions=[
+                    GhostButton("Cancel", on_click=lambda _: page.pop_dialog()),
+                    confirm_button,
+                ],
+                actions_alignment=ft.MainAxisAlignment.END,
+            )
+        )
 
 
 class ResultTile(ft.Container):
