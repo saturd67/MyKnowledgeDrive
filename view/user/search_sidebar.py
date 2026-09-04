@@ -172,13 +172,49 @@ class SearchPanel(ft.Column):
             return Pill("failed", "danger")
         if search_view.is_searched:
             return Pill(str(len(search_view.get_search_results())), "success")
+        if search_view.is_initialising:
+            return Pill("loading", "warning")
         return ft.Container()
+
+    def _loading_block(self):
+        """The model loading, before anything has been searched for.
+
+        A spinner rather than an `EmptyState`: that one badges an icon, and a
+        wait this long needs something that visibly moves. It says what is
+        happening, because a portal that looks ready but answers slowly is
+        worse than one that admits it is still getting up.
+        """
+        p = palette()
+        return ft.Container(
+            content=ft.Column(
+                [
+                    ft.ProgressRing(width=26, height=26, stroke_width=3),
+                    ft.Container(height=Space.MD),
+                    ft.Text("Getting search ready", size=13, weight=ft.FontWeight.W_600,
+                            color=p.text),
+                    ft.Text("Loading the embedding model. It happens once, and you can "
+                            "type your question while it finishes.",
+                            size=11, color=p.text_muted, text_align=ft.TextAlign.CENTER),
+                ],
+                spacing=2,
+                tight=True,
+                alignment=ft.MainAxisAlignment.CENTER,
+                horizontal_alignment=ft.CrossAxisAlignment.CENTER,
+            ),
+            alignment=ft.Alignment.CENTER,
+            height=200,
+            padding=ft.Padding.symmetric(horizontal=Space.MD, vertical=0),
+        )
 
     def _results_list(self):
         p = palette()
         search_view = self.search_view
 
         if not search_view.is_searched:
+            # The wait wins over "no search yet": both mean an empty list, but
+            # only one of them is something happening.
+            if search_view.is_initialising:
+                return self._loading_block()
             return EmptyState(
                 ft.Icons.TRAVEL_EXPLORE_ROUNDED,
                 "No search yet",

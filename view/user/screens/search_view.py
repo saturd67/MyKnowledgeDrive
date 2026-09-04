@@ -94,6 +94,11 @@ class SearchView(BaseView):
         self.search_results = []
         #: Why the last search failed, when it did.
         self.error = None
+        #: Whether the embedding model is still loading. True from the start:
+        #: `UserPortal.did_mount` kicks the load off as soon as the portal is
+        #: drawn, which is before anything here gets a chance to set it, so
+        #: the first paint has to already say so.
+        self.is_initialising = True
         #: Reads the picked hit's original file - what the pane draws, when
         #: the source is still on disk.
         self.source_file_service = SourceFileService()
@@ -151,6 +156,20 @@ class SearchView(BaseView):
             return
         self.reader_container.page.run_thread(self.run_search)
 
+    def init_search(self):
+        """Load the embedding model, with the sidebar saying so meanwhile.
+
+        Blocking - `UserPortal.did_mount` puts it on a worker thread. The flag
+        is cleared whatever happens: a model that will not load is still not
+        loading any more, and leaving the spinner up would promise a wait that
+        has already ended. The failure itself surfaces on the first search.
+        """
+        try:
+            searchService.init_collection()
+        finally:
+            self.is_initialising = False
+            self.refresh()
+
     def run_search(self):
         try:
             self.search_results = searchService.search(self.search_query)
@@ -159,6 +178,9 @@ class SearchView(BaseView):
             self.search_results = []
             self.error = str(error)
             self.status = "failed"
+        # A finished search means the model is loaded, however it got there -
+        # this is what clears the flag if `init_search` never ran.
+        self.is_initialising = False
         self.refresh()
 
     def clear(self):

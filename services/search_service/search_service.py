@@ -73,6 +73,26 @@ class SearchService:
             )
         ]
 
+    def init_collection(self):
+        """Load the embedding model now, so the first search does not.
+
+        `collection()` caches what it builds, and building it is what costs
+        the seconds - loading the sentence-transformer. Called as the user
+        portal opens, that wait overlaps with reading the screen and typing a
+        query, instead of landing in front of someone who has just asked a
+        question and is watching a spinner.
+
+        Blocking, so call it on a worker thread. Failures are logged and
+        swallowed: this is a head start, not a search. A missing store or a
+        model that will not load is reported properly by `search()`, which is
+        where somebody is actually waiting on the answer.
+        """
+        logger.info("Initialising the collection, ahead of the first search")
+        try:
+            self.collection()
+        except Exception as error:
+            logger.warning(f"Could not initialise the collection - {error}")
+
     def collection(self):
         """The collection to query, or None when it does not exist yet.
 
