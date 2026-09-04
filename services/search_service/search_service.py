@@ -64,8 +64,8 @@ class SearchService:
         )
 
         return [
-            SearchResult.from_chroma(document_id, metadata, distance, text)
-            for document_id, metadata, distance, text in zip(
+            SearchResult.from_chroma(document_id, metadata, distance, file_text)
+            for document_id, metadata, distance, file_text in zip(
                 result["ids"][0],
                 result["metadatas"][0],
                 result["distances"][0],

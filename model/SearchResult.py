@@ -13,22 +13,27 @@ PREVIEW_LENGTH = 220
 
 class SearchResult(Document):
 
-    def __init__(self, document_id, label, modified_time=None, distance=0.0, text=""):
+    def __init__(self, document_id, label, modified_time=None, distance=0.0, file_text=""):
         super().__init__(document_id, label, modified_time)
         #: Cosine distance from the query. Smaller is closer.
         self.distance = distance
-        #: The document as it was embedded - what the reading pane shows.
-        self.text = text
+        #: The document as it was embedded - the images already read out as
+        #: text. What the pane falls back to when the original is gone.
+        self.file_text = file_text
+        #: The original file, before conversion took its images out. Filled in
+        #: by the screen from `SourceFileService`, and left None when there is
+        #: no source on disk any more.
+        self.original_file_text = None
 
     @staticmethod
-    def from_chroma(document_id, metadata, distance=0.0, text=""):
+    def from_chroma(document_id, metadata, distance=0.0, file_text=""):
         metadata = metadata or {}
         return SearchResult(
             document_id=document_id,
             label=metadata.get("label") or document_id,
             modified_time=metadata.get("modifiedTime"),
             distance=distance,
-            text=text,
+            file_text=file_text,
         )
 
     @property
@@ -41,6 +46,21 @@ class SearchResult(Document):
         return max(0.0, min(1.0, 1.0 - self.distance))
 
     @property
+    def is_original(self):
+        """Whether `display_text` is the source file or the embedded copy.
+
+        The pane says which of the two it is showing, because they are not the
+        same file: one has the pictures, the other has the text that was read
+        out of them.
+        """
+        return self.original_file_text is not None
+
+    @property
+    def display_text(self):
+        """What the reading pane draws - the original wherever there is one."""
+        return self.original_file_text if self.is_original else self.file_text
+
+    @property
     def preview(self):
         """The opening of the document, on one line.
 
@@ -49,7 +69,7 @@ class SearchResult(Document):
         particular passage is what scored, and pointing at one would be
         inventing a reason. Chunked embeddings would change that.
         """
-        text = " ".join(self.text.split())
-        if len(text) <= PREVIEW_LENGTH:
-            return text
-        return text[:PREVIEW_LENGTH].rsplit(" ", 1)[0] + " ..."
+        file_text = " ".join(self.file_text.split())
+        if len(file_text) <= PREVIEW_LENGTH:
+            return file_text
+        return file_text[:PREVIEW_LENGTH].rsplit(" ", 1)[0] + " ..."

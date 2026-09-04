@@ -103,7 +103,7 @@ class SearchPanel(ft.Column):
         # The height sits on the box below, not on the field: a forced height
         # here renders the input decoration at the top of its box.
         text_field = ft.TextField(
-            value=search_view.query,
+            value=search_view.search_query,
             hint_text="Ask for a note or a command ...",
             hint_style=ft.TextStyle(size=13, color=p.text_faint),
             text_size=13,
@@ -117,7 +117,7 @@ class SearchPanel(ft.Column):
         )
 
         line = [text_field]
-        if search_view.query:
+        if search_view.search_query:
             line.append(
                 IconButton(ft.Icons.CLOSE_ROUNDED, "Clear", lambda _: search_view.clear())
             )
@@ -171,7 +171,7 @@ class SearchPanel(ft.Column):
         if search_view.status == "failed":
             return Pill("failed", "danger")
         if search_view.is_searched:
-            return Pill(str(len(search_view.results())), "success")
+            return Pill(str(len(search_view.get_search_results())), "success")
         return ft.Container()
 
     def _results_list(self):
@@ -194,7 +194,7 @@ class SearchPanel(ft.Column):
                 height=200,
             )
 
-        if not search_view.results():
+        if not search_view.get_search_results():
             return EmptyState(
                 ft.Icons.SEARCH_OFF_ROUNDED,
                 "No matches",
@@ -209,7 +209,7 @@ class SearchPanel(ft.Column):
                     on_click=lambda _, i=index: search_view.select(i),
                     hover_bgcolor=None if index == search_view.selected_index else p.surface_high,
                 )
-                for index, result in enumerate(search_view.results())
+                for index, result in enumerate(search_view.get_search_results())
             ],
             spacing=Space.XS,
             scroll=ft.ScrollMode.AUTO,

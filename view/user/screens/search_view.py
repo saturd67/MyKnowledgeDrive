@@ -8,11 +8,28 @@ A query goes to `SearchService`, which embeds it with the same model the
 documents were embedded with. That model loads on the first search of a
 process and takes seconds, so a search runs on a worker thread and the screen
 draws a searching state meanwhile. Open in Drive is not wired up.
+
+What the pane reads is the *original* file, from `SourceFileService` - the
+copy under the input folder that still has its base64 images in it, rather
+than the converted text those images were read out of. So a screenshot in a
+Google Doc is a picture here again instead of the OCR of one. The embedded
+text is the fallback for a document whose source has gone: see
+services/source_file_service/source_file_service.py.
 """
+
+import base64
+import binascii
+import logging
+import re
 
 import flet as ft
 
+from constant.settings import DRIVE_FOLDER_ID
+from model.SearchResult import SearchResult
+from services.SettingService import SettingNotFoundError, settingService
+from services.image_converter_service.image_converter_service import ImageConverterService
 from services.search_service.search_service import searchService
+from services.source_file_service.source_file_service import SourceFileService
 from view.base_view import BaseView
 from view.clipboard import copy_to_clipboard
 from view.theme import Radius, Space, palette
@@ -29,70 +46,35 @@ from view.widgets.feedback.empty_state import EmptyState
 from view.widgets.text.label import Label
 from view.widgets.text.mono import Mono
 
+logger = logging.getLogger(__name__)
+
 #: Both panes open on a header - the brand in the sidebar, the file bar in the
 #: reading pane - and they share this height so the rule under each of them
 #: lands on the same line.
 HEADER_HEIGHT = BrandHeader.HEIGHT
 
-#: Bullets in the converted markdown start with one of these.
-BULLET_MARKERS = ("- ", "* ", "+ ")
+#: The Drive folder the library is mirrored from. The *folder*, not the file:
+#: `FileEmbedderService` sets the document id to the converted path, so there
+#: is no Drive file id anywhere in the collection to open one file with. That
+#: arrives with the `file` table - plans/file-table.md.
+DRIVE_FOLDER_URL = "https://drive.google.com/drive/folders/{folder_id}"
 
 
-def parse_blocks(text):
-    """Split converted text into the (kind, text) blocks `FileBody` draws.
+def drive_folder_url():
+    """The link the Open in Google Drive button follows, or None.
 
-    Deliberately small: the converted files are the markdown the downloader
-    wrote or the plain text the image converter wrote, and this recognises
-    only what the reading pane can render. Anything it does not know becomes a
-    paragraph, so nothing is ever dropped.
+    None when the folder id is blank or its row has been deleted, and the
+    button is disabled rather than opening `.../folders/` and landing on a
+    Drive error page.
     """
-    blocks = []
-    paragraph = []
-    code = None
+    try:
+        folder_id = settingService.find_active_by_key(DRIVE_FOLDER_ID)
+    except SettingNotFoundError:
+        logger.warning(f"No '{DRIVE_FOLDER_ID}' setting - cannot link to Drive")
+        return None
 
-    def close_paragraph():
-        if paragraph:
-            blocks.append(("p", " ".join(paragraph)))
-            paragraph.clear()
-
-    for line in text.splitlines():
-        stripped = line.strip()
-
-        if stripped.startswith("```"):
-            if code is None:
-                close_paragraph()
-                code = []
-            else:
-                blocks.append(("code", "\n".join(code)))
-                code = None
-            continue
-
-        if code is not None:
-            code.append(line)
-            continue
-
-        if not stripped:
-            close_paragraph()
-            continue
-
-        if stripped.startswith("#"):
-            close_paragraph()
-            level = len(stripped) - len(stripped.lstrip("#"))
-            blocks.append(("h1" if level == 1 else "h2", stripped.lstrip("#").strip()))
-            continue
-
-        if stripped[:2] in BULLET_MARKERS:
-            close_paragraph()
-            blocks.append(("bullet", stripped[2:].strip()))
-            continue
-
-        paragraph.append(stripped)
-
-    close_paragraph()
-    # An unterminated fence still has to show, or the tail of the file vanishes.
-    if code:
-        blocks.append(("code", "\n".join(code)))
-    return blocks
+    folder_id = (folder_id or "").strip()
+    return DRIVE_FOLDER_URL.format(folder_id=folder_id) if folder_id else None
 
 
 class SearchView(BaseView):
@@ -106,14 +88,17 @@ class SearchView(BaseView):
 
     def __init__(self):
         super().__init__()
-        self.query = ""
+        self.search_query = ""
         self.selected_index = 0
         #: idle | searching | done | failed
         self.status = "idle"
         #: The hits of the last finished search.
-        self.hits = []
+        self.search_results = []
         #: Why the last search failed, when it did.
         self.error = None
+        #: Reads the picked hit's original file - what the pane draws, when
+        #: the source is still on disk.
+        self.source_file_service = SourceFileService()
 
         # The reading pane runs to the window edges - no padding frame.
         self.reader_container = ft.Container(expand=True)
@@ -136,28 +121,28 @@ class SearchView(BaseView):
     def is_searching(self):
         return self.status == "searching"
 
-    def results(self):
+    def get_search_results(self) -> list[SearchResult]:
         """The hits, closest first - the order chroma already returns them in."""
-        return self.hits
+        return self.search_results
 
-    def result(self):
+    def get_search_result(self) -> SearchResult | None:
         """The hit the reading pane is showing, or None when there are none."""
-        if not self.hits:
+        if not self.search_results:
             return None
-        return self.hits[min(self.selected_index, len(self.hits) - 1)]
+        return self.search_results[min(self.selected_index, len(self.search_results) - 1)]
 
-    def search(self, query):
+    def search(self, search_query):
         """Runs on a worker thread: the first search of a process loads the
         embedding model, which would freeze the window for seconds."""
-        query = (query or "").strip()
-        if not query:
+        search_query = (search_query or "").strip()
+        if not search_query:
             self.clear()
             return
 
-        self.query = query
+        self.search_query = search_query
         self.selected_index = 0
         self.status = "searching"
-        self.hits = []
+        self.search_results = []
         self.error = None
         self.refresh()
 
@@ -170,19 +155,19 @@ class SearchView(BaseView):
 
     def run_search(self):
         try:
-            self.hits = searchService.search(self.query)
+            self.search_results = searchService.search(self.search_query)
             self.status = "done"
         except Exception as error:
-            self.hits = []
+            self.search_results = []
             self.error = str(error)
             self.status = "failed"
         self.refresh()
 
     def clear(self):
-        self.query = ""
+        self.search_query = ""
         self.selected_index = 0
         self.status = "idle"
-        self.hits = []
+        self.search_results = []
         self.error = None
         self.refresh()
 
@@ -197,15 +182,21 @@ class SearchView(BaseView):
         control_update(self.reader_container)
 
     def _fill_reader(self):
-        result = self.result()
+        result = self.get_search_result()
         if result is not None:
+            # Filled in here rather than by the widget, which reads it back off
+            # the result: a widget's `build()` runs inside flet's
+            # reconciliation pass, on the event loop, so a file read there
+            # would block every redraw. Here, the path that follows a search is
+            # already on the worker thread.
+            result.original_file_text = self.source_file_service.find_original_file_text(result.document_id)
             self.reader_container.content = SearchFilePreviewContainer(result)
         elif self.status == "searching":
-            self.reader_container.content = SearchingContainer(self.query)
+            self.reader_container.content = SearchingContainer(self.search_query)
         elif self.status == "failed":
             self.reader_container.content = SearchFailedContainer(self.error)
         elif self.status == "done":
-            self.reader_container.content = NoResultsContainer(self.query)
+            self.reader_container.content = NoResultsContainer(self.search_query)
         else:
             self.reader_container.content = SearchIntroductionContainer()
 
@@ -318,19 +309,22 @@ class SearchFailedContainer(CentredMessageContainer):
 
 
 class SearchFilePreviewContainer(ft.Column):
-    """The file bar tops the pane; the converted text fills what is left.
+    """The file bar tops the pane; the file itself fills what is left.
 
     Both run to the window edge, so the rule under the bar is the only line
     between them - an outline round either would double the sidebar border on
     the left and be clipped on the right.
     """
 
-    def __init__(self, result):
+    def __init__(self, result: SearchResult):
         super().__init__()
         self.result = result
 
     def build(self):
-        self.controls = [FileHeader(self.result), FileBody(self.result)]
+        self.controls = [
+            FileHeader(self.result),
+            FileBody(self.result)
+        ]
         self.spacing = 0
         self.expand = True
 
@@ -342,8 +336,24 @@ class FileHeader(Card):
     where the hits are compared against each other.
     """
 
-    def __init__(self, result):
+    def __init__(self, result: SearchResult):
         p = palette()
+
+        # `url` is a field on every flet button, so following it is native -
+        # the OS opens the default browser, with no handler and no page to
+        # reach for. Set after construction, the way the other buttons in this
+        # app take their state.
+        folder_url = drive_folder_url()
+        open_in_drive_button = PrimaryButton("Open in Google Drive",
+                                             icon=ft.Icons.OPEN_IN_NEW_ROUNDED, is_dense=True)
+        open_in_drive_button.url = folder_url
+        open_in_drive_button.disabled = folder_url is None
+        # The label says Drive, but what opens is the folder the whole library
+        # is mirrored from, not this file - so the tooltip says which.
+        open_in_drive_button.tooltip = (
+            "Open the Drive folder this library mirrors" if folder_url is not None
+            else "Set the Drive folder id on the admin Settings screen first"
+        )
 
         super().__init__(
             ft.Row(
@@ -371,8 +381,7 @@ class FileHeader(Card):
                     IconButton(ft.Icons.CONTENT_COPY_ROUNDED, "Copy document id",
                                lambda e, r=result: copy_to_clipboard(
                                    e.control, r.document_id, "the document id")),
-                    PrimaryButton("Open in Google Drive", icon=ft.Icons.OPEN_IN_NEW_ROUNDED,
-                                  is_dense=True),
+                    open_in_drive_button,
                 ],
                 spacing=Space.SM,
                 vertical_alignment=ft.CrossAxisAlignment.CENTER,
@@ -385,26 +394,44 @@ class FileHeader(Card):
 
 
 class FileBody(Card):
-    """The converted text - what was embedded, and what is read here."""
+    """The file itself - the original where there is one, and its pictures.
 
-    def __init__(self, result):
-        is_image = result.kind == "image"
-        blocks = parse_blocks(result.text)
+    The original is the copy under the input folder, which still has its
+    base64 images in it. The converted text is the fallback for a document
+    whose source has gone, and reads the way this pane always did: the images
+    already replaced by the text OCR found in them.
 
-        body = [OpeningLines(result.preview)] if result.preview else []
+    Turning that file into blocks is this class's own business - `_parse_blocks`
+    and the helpers under it are the reading half of `_block`, which draws what
+    they produce, and nothing else calls them.
+    """
+
+    #: Bullets in the converted markdown start with one of these.
+    BULLET_MARKERS = ("- ", "* ", "+ ")
+
+    #: A data URI that neither image pattern claimed - a payload with a
+    #: character outside the base64 alphabet, say. Dropping it beats rendering
+    #: a megabyte of base64 as a paragraph, which is what this pane used to do.
+    STRAY_DATA_URI = re.compile(r"data:image/[^;,]+;base64,[A-Za-z0-9+/=\s]+")
+
+    def __init__(self, result: SearchResult):
+        is_original = result.is_original
+        blocks = self._parse_blocks(result.display_text)
+
         # A converted file opens with its own title, which the header above
         # already shows, so that first heading is dropped.
-        body += [
-            self._block(kind, text)
-            for index, (kind, text) in enumerate(blocks)
+        body = [
+            self._block(kind, payload)
+            for index, (kind, payload) in enumerate(blocks)
             if not (index == 0 and kind == "h1")
         ]
         if not blocks:
             body.append(
                 EmptyState(
                     ft.Icons.DESCRIPTION_OUTLINED,
-                    "No converted text",
-                    "This file has not been converted yet, so there is nothing to read.",
+                    "Nothing to read" if is_original else "No converted text",
+                    "The original file is empty." if is_original
+                    else "This file has not been converted yet, so there is nothing to read.",
                     height=240,
                 )
             )
@@ -415,10 +442,13 @@ class FileBody(Card):
                     ft.Row(
                         [
                             ft.Container(content=Label("File content"), expand=True),
+                            # Which of the two is on screen, because they are
+                            # not the same file: one has the pictures, the
+                            # other has the text that was read out of them.
                             Pill(
-                                "Text extracted with OCR" if is_image else "Converted text",
-                                "warning" if is_image else "neutral",
-                                icon=(ft.Icons.IMAGE_SEARCH_ROUNDED if is_image
+                                "Original file" if is_original else "Converted text",
+                                "primary" if is_original else "neutral",
+                                icon=(ft.Icons.IMAGE_ROUNDED if is_original
                                       else ft.Icons.ARTICLE_ROUNDED),
                             ),
                         ],
@@ -439,9 +469,27 @@ class FileBody(Card):
             expand=True,
         )
 
-    @staticmethod
-    def _block(kind, text):
+    def _block(self, kind, payload):
         p = palette()
+        text = payload
+
+        if kind == "image":
+            return ft.Container(
+                # flet 0.86 dropped `src_base64`; `src` takes the raw bytes.
+                # SCALE_DOWN rather than CONTAIN, and no width or height: a
+                # screenshot wider than the pane is shrunk to fit it, and a
+                # small inline icon is left at its own size instead of being
+                # blown up to fill a box.
+                content=ft.Image(
+                    src=payload,
+                    fit=ft.BoxFit.SCALE_DOWN,
+                    border_radius=Radius.SM,
+                    error_content=ft.Text(ImageConverterService.UNREADABLE_IMAGE_TEXT,
+                                          size=12, color=p.text_faint),
+                ),
+                alignment=ft.Alignment.CENTER_LEFT,
+                padding=ft.Padding.only(top=Space.XS, bottom=Space.MD),
+            )
 
         if kind in ("h1", "h2"):
             return ft.Container(
@@ -480,36 +528,151 @@ class FileBody(Card):
             padding=ft.Padding.only(bottom=Space.SM),
         )
 
+    # --- the file, read into the blocks `_block` draws ------------------------
 
-class OpeningLines(ft.Container):
-    """How the document starts, before the document itself.
+    def _parse_blocks(self, text):
+        """Split a file into the (kind, payload) blocks `_block` draws.
 
-    Not "the passage that matched": one vector is embedded per whole file, so
-    no passage is what scored. See `SearchResult.preview`.
-    """
+        Deliberately small: the files are the markdown the downloader wrote or
+        the plain text the image converter wrote, and this recognises only what
+        the reading pane can render. Anything it does not know becomes a
+        paragraph, so nothing is ever dropped.
 
-    def __init__(self, snippet):
-        super().__init__()
-        self.snippet = snippet
+        The payload is text for every kind but `image`, which carries the
+        decoded bytes of the picture.
+        """
+        encoded_images_by_reference = self._images_by_reference(text)
+        # The definitions are markup rather than content - they are only what
+        # the references point at, and each carries a whole base64 payload on
+        # one line.
+        text = ImageConverterService.REFERENCE_DEFINITION.sub("", text)
 
-    def build(self):
-        p = palette()
-        self.content = ft.Row(
-            [
-                ft.Icon(ft.Icons.FORMAT_QUOTE_ROUNDED, size=16, color=p.primary),
-                ft.Column(
-                    [
-                        Label("Opening lines"),
-                        ft.Text(self.snippet, size=12, color=p.text),
-                    ],
-                    spacing=3,
-                    expand=True,
-                ),
-            ],
-            spacing=Space.MD,
-            vertical_alignment=ft.CrossAxisAlignment.START,
-        )
-        self.bgcolor = p.primary_soft
-        self.border_radius = Radius.MD
-        self.padding = Space.MD
-        self.margin = ft.Margin.only(bottom=Space.LG)
+        blocks = []
+        paragraph = []
+        code = None
+
+        def close_paragraph():
+            if paragraph:
+                blocks.append(("p", " ".join(paragraph)))
+                paragraph.clear()
+
+        for line in text.splitlines():
+            stripped = line.strip()
+
+            if stripped.startswith("```"):
+                if code is None:
+                    close_paragraph()
+                    code = []
+                else:
+                    blocks.append(("code", "\n".join(code)))
+                    code = None
+                continue
+
+            if code is not None:
+                code.append(line)
+                continue
+
+            if not stripped:
+                close_paragraph()
+                continue
+
+            # Before the heading and bullet checks: a picture is the content of
+            # the line it sits on, whatever else that line is marked up as.
+            line_image_blocks = self._image_blocks(stripped, encoded_images_by_reference)
+            if line_image_blocks is not None:
+                close_paragraph()
+                blocks += line_image_blocks
+                continue
+
+            if stripped.startswith("#"):
+                close_paragraph()
+                level = len(stripped) - len(stripped.lstrip("#"))
+                blocks.append(("h1" if level == 1 else "h2", stripped.lstrip("#").strip()))
+                continue
+
+            if stripped[:2] in self.BULLET_MARKERS:
+                close_paragraph()
+                blocks.append(("bullet", stripped[2:].strip()))
+                continue
+
+            paragraph.append(self.STRAY_DATA_URI.sub("[image]", stripped))
+
+        close_paragraph()
+        # An unterminated fence still has to show, or the tail of the file
+        # vanishes.
+        if code:
+            blocks.append(("code", "\n".join(code)))
+        return blocks
+
+    def _images_by_reference(self, text):
+        """The `[image1]: <data:image/png;base64,...>` payloads, keyed by name.
+
+        Collected up front because the definitions sit at the *end* of a Google
+        Doc export while the `![alt][image1]` that points at them is in the
+        body, so a single pass down the lines would reach the reference first.
+        """
+        return dict(ImageConverterService.REFERENCE_DEFINITION.findall(text))
+
+    def _image_blocks(self, line, encoded_images_by_reference):
+        """One line split into image and text blocks, in source order.
+
+        None when the line holds no image at all, so the caller can carry on
+        treating it as the ordinary markdown it is.
+        """
+        spans = self._image_spans(line, encoded_images_by_reference)
+        if not spans:
+            return None
+
+        blocks = []
+        cursor = 0
+        for start, end, encoded_image in spans:
+            leading_text = line[cursor:start].strip()
+            if leading_text:
+                blocks.append(("p", leading_text))
+            image_bytes = self._decode_image(encoded_image)
+            blocks.append(("image", image_bytes) if image_bytes is not None
+                          else ("p", ImageConverterService.UNREADABLE_IMAGE_TEXT))
+            cursor = end
+
+        trailing_text = line[cursor:].strip()
+        if trailing_text:
+            blocks.append(("p", trailing_text))
+        return blocks
+
+    def _image_spans(self, line, encoded_images_by_reference):
+        """(start, end, base64) for every image on one line, in the order they sit.
+
+        Both shapes the pipeline produces: `![alt](data:image/png;base64,...)`,
+        which is what mammoth writes for a .docx, and `![alt][image1]`, which is
+        what Drive writes exporting a Google Doc. They use different delimiters,
+        so no run of text can match both.
+        """
+        spans = []
+
+        for match in ImageConverterService.INLINE_IMAGE.finditer(line):
+            spans.append((match.start(), match.end(), match.group(1)))
+
+        for match in ImageConverterService.REFERENCE_IMAGE.finditer(line):
+            encoded_image = encoded_images_by_reference.get(match.group(1))
+            # A reference whose definition is missing is left alone, to fall
+            # through and read as the ordinary text it now is.
+            if encoded_image is not None:
+                spans.append((match.start(), match.end(), encoded_image))
+
+        spans.sort()
+        return spans
+
+    def _decode_image(self, encoded_image):
+        """A base64 payload as the bytes flet draws, or None if it will not decode."""
+        try:
+            image_bytes = base64.b64decode(re.sub(r"\s+", "", encoded_image))
+        except (binascii.Error, ValueError) as error:
+            logger.warning(f"Could not decode an embedded image - {error}")
+            return None
+
+        # b64decode is lenient: a payload of "====" comes back as no bytes at
+        # all rather than raising, and an empty `src` draws as a broken picture.
+        if not image_bytes:
+            logger.warning("An embedded image decoded to nothing")
+            return None
+        return image_bytes
