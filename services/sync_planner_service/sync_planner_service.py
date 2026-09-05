@@ -46,6 +46,7 @@ from services.file_downloader_service.downloadable_file.unsupported_file import 
 from services.file_downloader_service.downloadable_file_factory import DownloadableFileFactory
 from services.file_downloader_service.file_downloader_service import FileDownloaderService
 from services.file_embedder_service.file_embedder_service import FileEmbedderService
+from services.file_path_header_service.file_path_header_service import FilePathHeaderService
 from services.image_converter_service.image_converter_service import ImageConverterService
 from services.library_service.library_service import LibraryService
 
@@ -282,6 +283,7 @@ class SyncPlannerService:
             return 0, 0
 
         image_converter_service = ImageConverterService()
+        file_path_header_service = FilePathHeaderService()
         converted_file_count = 0
         converted_image_count = 0
 
@@ -299,6 +301,10 @@ class SyncPlannerService:
 
             if output_path.suffix.lower() in ImageConverterService.MARKDOWN_EXTENSIONS:
                 converted_image_count += image_converter_service.convert_markdown_file(output_path)
+
+            # After the images, and for every copied file rather than only the
+            # markdown - a .txt is embedded too, so its path counts as well.
+            file_path_header_service.add_to_file(output_path, self.output_dir)
 
         return converted_file_count, converted_image_count
 

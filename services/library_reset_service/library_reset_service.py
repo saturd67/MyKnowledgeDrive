@@ -41,6 +41,7 @@ from services.DriveFileService import driveFileService
 from services.SettingService import settingService
 from services.file_downloader_service.file_downloader_service import FileDownloaderService
 from services.file_embedder_service.file_embedder_service import FileEmbedderService
+from services.file_path_header_service.file_path_header_service import FilePathHeaderService
 from services.image_converter_service.image_converter_service import ImageConverterService
 
 logger = logging.getLogger(__name__)
@@ -163,7 +164,13 @@ class LibraryResetService:
         logger.info(f"Copying {self.input_dir} to {self.output_dir}")
         shutil.copytree(self.input_dir, self.output_dir, dirs_exist_ok=True)
         image_converter_service = ImageConverterService()
-        return image_converter_service.start_converting_images(self.output_dir)
+        results = image_converter_service.start_converting_images(self.output_dir)
+
+        # After the images, so the path is the first line of the finished file
+        # rather than something the image pass could push down.
+        FilePathHeaderService().add_to_folder(self.output_dir)
+
+        return results
 
     @staticmethod
     def _start_step(step_number, on_step, is_cancelled):
