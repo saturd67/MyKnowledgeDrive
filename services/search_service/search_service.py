@@ -6,9 +6,10 @@ nothing. That model is loaded lazily and cached, so the first search of a
 process takes seconds and the rest are quick - which is why the screen runs a
 search on a worker thread rather than on the event loop.
 
-The cache is keyed on the settings it was built from, so editing the store,
-the collection or the model on the Settings screen rebuilds it rather than
-quietly searching the old one.
+The model is the only thing cached, and it is cached on its own name, so
+changing it on the Settings screen loads the new one rather than quietly
+searching with the old. The collection itself is fetched fresh every time -
+see `collection()` for why caching it was a bug.
 """
 
 import logging
@@ -32,8 +33,11 @@ logger = logging.getLogger(__name__)
 class SearchService:
 
     def __init__(self):
-        self._settings_key = None
-        self._collection = None
+        #: The loaded sentence-transformer and the model name it was built
+        #: from. The only thing worth keeping between calls: loading it is the
+        #: seconds, and everything else here is a metadata lookup.
+        self._embedding_model = None
+        self._embedding_function = None
 
     def search(self, query):
         """The closest documents to `query`, closest first.
@@ -96,16 +100,20 @@ class SearchService:
     def collection(self):
         """The collection to query, or None when it does not exist yet.
 
-        Cached with the settings it was built from: rebuilding on every search
-        would reload the embedding model every time.
+        Fetched fresh every call, deliberately. A reset does not empty the
+        collection, it deletes it and creates another
+        (`FileEmbedderService.reset_collection`), and the new one carries a new
+        internal id. A handle held across that reset therefore points at
+        something chroma has dropped, and every query after it fails with
+        `Collection [<uuid>] does not exist` - while none of the settings this
+        used to key its cache on has changed, so nothing could notice.
+
+        Only the model is cached, and it is the part that costs: loading it is
+        seconds, while listing and getting a collection are metadata lookups.
         """
         chroma_store_dir = settingService.get_path(PATHS_CHROMA_STORE)
         collection_name = settingService.find_active_by_key(EMBEDDING_COLLECTION)
         embedding_model = settingService.find_active_by_key(EMBEDDING_MODEL)
-        settings_key = (chroma_store_dir, collection_name, embedding_model)
-
-        if settings_key == self._settings_key:
-            return self._collection
 
         client = chromadb.PersistentClient(
             path=chroma_store_dir,
@@ -117,21 +125,30 @@ class SearchService:
         ]
         if collection_name not in names:
             logger.info(f"No collection '{collection_name}' in {chroma_store_dir}")
-            self._settings_key = settings_key
-            self._collection = None
             return None
 
-        logger.info(f"Loading embedding model {embedding_model}")
-        self._collection = client.get_collection(
+        return client.get_collection(
             name=collection_name,
-            embedding_function=embedding_functions.SentenceTransformerEmbeddingFunction(
-                model_name=embedding_model
-            ),
+            embedding_function=self.embedding_function(embedding_model),
         )
-        self._settings_key = settings_key
-        return self._collection
+
+    def embedding_function(self, embedding_model):
+        """The sentence-transformer, loaded once per model name.
+
+        This is the load `init_collection` exists to get out of the way of the
+        first search, so it is kept for the life of the process - keyed on the
+        model it was built from, so changing that on the Settings screen loads
+        the new one instead of searching with the old.
+        """
+        if embedding_model != self._embedding_model:
+            logger.info(f"Loading embedding model {embedding_model}")
+            self._embedding_function = embedding_functions.SentenceTransformerEmbeddingFunction(
+                model_name=embedding_model
+            )
+            self._embedding_model = embedding_model
+        return self._embedding_function
 
 
-# Shared instance - the cached collection is what keeps the model load to the
-# first search of the process rather than every search.
+# Shared instance - the cached model is what keeps the load to the first
+# search of the process rather than every search.
 searchService = SearchService()
