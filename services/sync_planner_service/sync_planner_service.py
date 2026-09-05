@@ -40,6 +40,7 @@ from constant.settings import (
     PATHS_OUTPUT_DIR,
 )
 from model.FileChange import FileChange
+from services.DriveFileService import driveFileService
 from services.SettingService import settingService
 from services.file_downloader_service.downloadable_file.unsupported_file import UnsupportedFile
 from services.file_downloader_service.downloadable_file_factory import DownloadableFileFactory
@@ -262,6 +263,11 @@ class SyncPlannerService:
                 failed_file_count += 1
                 continue
             downloaded_file_count += is_downloaded and 1 or 0
+
+        # Only what this update fetched, and no `deactivate_missing`: an update
+        # touches the files it was told to and leaves the rest of the library
+        # alone, so the mappings it did not write are still true.
+        driveFileService.save_all(file_downloader_service.drive_ids_by_document_id)
 
         return downloaded_file_count, failed_file_count
 

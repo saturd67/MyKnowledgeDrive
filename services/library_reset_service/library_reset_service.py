@@ -37,6 +37,7 @@ from constant.settings import (
     PATHS_INPUT_DIR,
     PATHS_OUTPUT_DIR,
 )
+from services.DriveFileService import driveFileService
 from services.SettingService import settingService
 from services.file_downloader_service.file_downloader_service import FileDownloaderService
 from services.file_embedder_service.file_embedder_service import FileEmbedderService
@@ -125,7 +126,17 @@ class LibraryResetService:
             settingService.get_path(DRIVE_SERVICE_ACCOUNT_FILE),
             settingService.find_active_by_key(DRIVE_SCOPE),
         )
-        return file_downloader_service.start_download()
+        results = file_downloader_service.start_download()
+
+        # Which Drive file each document came from, so the reading pane can
+        # link to it. A reset is a rebuild from Drive, so anything this run did
+        # not download is no longer in the library either - its mapping is
+        # retired rather than left pointing at a document that has gone.
+        drive_ids_by_document_id = file_downloader_service.drive_ids_by_document_id
+        driveFileService.save_all(drive_ids_by_document_id)
+        driveFileService.deactivate_missing(list(drive_ids_by_document_id))
+
+        return results
 
     def _clear_downloaded_files(self):
         """Empties the source folder, so what an earlier run left is gone.

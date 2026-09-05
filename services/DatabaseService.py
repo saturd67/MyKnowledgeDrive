@@ -32,10 +32,12 @@ class DatabaseService:
         # Imported here rather than at the top: every repository reaches
         # DatabaseService through BaseRepository, so a module-level import
         # would be a cycle.
+        from repository.DriveFileRepository import DriveFileRepository
         from repository.SettingRepository import SettingRepository
 
         repositories = [
             SettingRepository(self),
+            DriveFileRepository(self),
             # FileRepository(self),          # plans/file-table.md
             # SyncRunRepository(self),       # plans/sync-run-table.md
             # SyncRunFileRepository(self),   # after SyncRunRepository - it has the parent id

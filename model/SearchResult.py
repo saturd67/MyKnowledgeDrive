@@ -24,6 +24,10 @@ class SearchResult(Document):
         #: by the screen from `SourceFileService`, and left None when there is
         #: no source on disk any more.
         self.original_file_text = None
+        #: The Drive file this document came from. Filled in by the screen from
+        #: `DriveFileService`, and left None for a document embedded before the
+        #: drive_file table existed - the collection itself never knew it.
+        self.drive_id = None
 
     @staticmethod
     def from_chroma(document_id, metadata, distance=0.0, file_text=""):

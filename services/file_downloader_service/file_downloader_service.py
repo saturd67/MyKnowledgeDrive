@@ -40,6 +40,12 @@ class FileDownloaderService:
     def __init__(self, folder_id, output_dir, service_account_file, scope):
         self.folder_id = folder_id
         self.output_dir = Path(output_dir)
+        #: What this run downloaded, as document id -> Drive file id. The
+        #: download is the one moment both are known, and nothing downstream
+        #: ever sees the Drive id again - the collection keeps the converted
+        #: path as its id. Gathered here and left for the caller to persist,
+        #: so this service still reads and writes nothing but Drive and disk.
+        self.drive_ids_by_document_id = {}
         credentials = Credentials.from_service_account_file(service_account_file, scopes=[scope])
         self.drive_service = build("drive", "v3", credentials=credentials, cache_discovery=False)
 
@@ -83,7 +89,10 @@ class FileDownloaderService:
         downloadable_file = DownloadableFileFactory.get_file(
             self.drive_service, file_id, self._sanitize_name(name), mime_type, target_dir
         )
-        return downloadable_file.download()
+        is_downloaded = downloadable_file.download()
+        if is_downloaded:
+            self._record_drive_id(downloadable_file, file_id)
+        return is_downloaded
 
     def _list_files_in_folder(self, folder_id, folder_path):
         drive_files = []
@@ -129,11 +138,31 @@ class FileDownloaderService:
                 continue
 
             if is_downloaded:
+                self._record_drive_id(downloadable_file, file["id"])
                 downloaded_file_count += 1
             else:
                 skipped_file_count += 1
 
         return downloaded_file_count, skipped_file_count, failed_file_count
+
+    def _record_drive_id(self, downloadable_file, file_id):
+        """Note which Drive file produced the path that was just written.
+
+        Keyed by the path relative to this run's output folder, because that
+        is what becomes the Chroma document id: the reset copies this tree to
+        the converted folder before embedding it, and `FileEmbedderService`
+        keys on the path relative to *that*. The copy preserves the structure,
+        so the same relative path names the same document in both.
+        """
+        output_file_path = downloadable_file.get_output_file_path()
+        try:
+            document_id = str(output_file_path.relative_to(self.output_dir))
+        except ValueError:
+            # A file written outside the run's own folder is not a document
+            # the collection will ever hold, so there is nothing to map.
+            logger.warning(f"Not mapping {output_file_path} - outside {self.output_dir}")
+            return
+        self.drive_ids_by_document_id[document_id] = file_id
 
     def _list_folder_children(self, folder_id):
         """Every non-trashed child of the folder, one page at a time."""

@@ -17,13 +17,10 @@ text is the fallback for a document whose source has gone: see
 services/source_file_service/source_file_service.py.
 """
 
-import logging
-
 import flet as ft
 
-from constant.settings import DRIVE_FOLDER_ID
 from model.SearchResult import SearchResult
-from services.SettingService import SettingNotFoundError, settingService
+from services.DriveFileService import driveFileService
 from services.image_converter_service.image_converter_service import ImageConverterService
 from services.search_service.search_service import searchService
 from services.source_file_service.source_file_service import SourceFileService
@@ -44,35 +41,29 @@ from view.widgets.feedback.empty_state import EmptyState
 from view.widgets.text.label import Label
 from view.widgets.text.mono import Mono
 
-logger = logging.getLogger(__name__)
-
 #: Both panes open on a header - the brand in the sidebar, the file bar in the
 #: reading pane - and they share this height so the rule under each of them
 #: lands on the same line.
 HEADER_HEIGHT = BrandHeader.HEIGHT
 
-#: The Drive folder the library is mirrored from. The *folder*, not the file:
-#: `FileEmbedderService` sets the document id to the converted path, so there
-#: is no Drive file id anywhere in the collection to open one file with. That
-#: arrives with the `file` table - plans/file-table.md.
-DRIVE_FOLDER_URL = "https://drive.google.com/drive/folders/{folder_id}"
+#: One file on Drive. `open?id=` rather than `file/d/<id>`, because the library
+#: is mixed: `file/d/` is the viewer for uploaded files, while a native Google
+#: Doc lives at docs.google.com/document/d/. `open` redirects to whichever is
+#: right for the id it is given.
+DRIVE_FILE_URL = "https://drive.google.com/open?id={drive_id}"
 
 
-def drive_folder_url():
-    """The link the Open in Google Drive button follows, or None.
+def drive_url(result):
+    """The Drive link for this document, or None when there is not one.
 
-    None when the folder id is blank or its row has been deleted, and the
-    button is disabled rather than opening `.../folders/` and landing on a
-    Drive error page.
+    The file itself or nothing. A document whose download never recorded a
+    Drive id - everything embedded before the drive_file table existed - has
+    no link, and the button is disabled rather than sending someone to the
+    folder instead, which is not the file they asked for.
     """
-    try:
-        folder_id = settingService.find_active_by_key(DRIVE_FOLDER_ID)
-    except SettingNotFoundError:
-        logger.warning(f"No '{DRIVE_FOLDER_ID}' setting - cannot link to Drive")
+    if not result.drive_id:
         return None
-
-    folder_id = (folder_id or "").strip()
-    return DRIVE_FOLDER_URL.format(folder_id=folder_id) if folder_id else None
+    return DRIVE_FILE_URL.format(drive_id=result.drive_id)
 
 
 class SearchView(BaseView):
@@ -210,6 +201,7 @@ class SearchView(BaseView):
             # would block every redraw. Here, the path that follows a search is
             # already on the worker thread.
             result.original_file_text = self.source_file_service.find_original_file_text(result.document_id)
+            result.drive_id = driveFileService.find_drive_id(result.document_id)
             self.reader_container.content = SearchFilePreviewContainer(result)
         elif self.status == "searching":
             self.reader_container.content = SearchingContainer(self.search_query)
@@ -363,16 +355,16 @@ class FileHeader(Card):
         # the OS opens the default browser, with no handler and no page to
         # reach for. Set after construction, the way the other buttons in this
         # app take their state.
-        folder_url = drive_folder_url()
+        drive_link = drive_url(result)
         open_in_drive_button = PrimaryButton("Open in Google Drive",
                                              icon=ft.Icons.OPEN_IN_NEW_ROUNDED, is_dense=True)
-        open_in_drive_button.url = folder_url
-        open_in_drive_button.disabled = folder_url is None
-        # The label says Drive, but what opens is the folder the whole library
-        # is mirrored from, not this file - so the tooltip says which.
+        open_in_drive_button.url = drive_link
+        open_in_drive_button.disabled = drive_link is None
+        # A disabled button says why rather than just refusing: the mapping
+        # arrives with a run, so there is something to do about it.
         open_in_drive_button.tooltip = (
-            "Open the Drive folder this library mirrors" if folder_url is not None
-            else "Set the Drive folder id on the admin Settings screen first"
+            "Open this file in Google Drive" if drive_link is not None
+            else "Not linked to Drive yet - run a sync or a reset to map this file"
         )
 
         super().__init__(
